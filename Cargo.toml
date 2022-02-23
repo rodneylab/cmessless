@@ -1,0 +1,14 @@
+[package]
+name = "cmessless"
+version = "0.0.1"
+authors = ["Rodney Johnson <ask@rodneylab.com>"]
+edition = "2021"
+description = "A markdown parser to output Astro markup."
+license = "BSD-3-Clause"
+repository = "https://github.com/rodneylab/cmessless"
+homepage = "https://rodneylab.com"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nom = "7.1.0"
