@@ -1,13 +1,46 @@
-use nom::bytes::complete::take_until;
 use nom::{
-    bytes::complete::tag, character::complete::multispace1, multi::many1_count,
-    sequence::terminated, IResult,
+    bytes::complete::{tag, take_until},
+    character::complete::{multispace0, multispace1},
+    combinator::rest,
+    multi::many1_count,
+    sequence::{preceded, separated_pair, terminated},
+    IResult,
 };
 use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
 };
+
+#[allow(dead_code)]
+fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
+    preceded(multispace0, rest)(line)
+}
+
+fn parse_bold_text(line: &str) -> IResult<&str, String> {
+    let (first_segment, remainder) = match parse_up_to_bold_segment(line) {
+        Ok((_, (value1, value2))) => (value1, value2),
+        Err(_) => return Ok(("", line.to_string())),
+    };
+    let (bold_segment, final_segment): (&str, &str) = match parse_bold_segment(remainder) {
+        Ok((_, (value1, value2))) => (value1, value2),
+        Err(_) => return Ok(("", line.to_string())),
+    };
+    // recursive call to catch any remaining emphasised text in the line
+    let (_, final_final_segment) = parse_bold_text(final_segment)?;
+    Ok((
+        "",
+        format!("{first_segment}<strong>{bold_segment}</strong>{final_final_segment}"),
+    ))
+}
+
+fn parse_up_to_bold_segment(line: &str) -> IResult<&str, (&str, &str)> {
+    separated_pair(take_until("**"), tag("**"), rest)(line)
+}
+
+fn parse_bold_segment(line: &str) -> IResult<&str, (&str, &str)> {
+    separated_pair(take_until("**"), tag("**"), rest)(line)
+}
 
 fn parse_author_name_from_cargo_pkg_authors(cargo_pkg_authors: &str) -> IResult<&str, &str> {
     take_until(" <")(cargo_pkg_authors)
@@ -30,7 +63,9 @@ fn parse_mdx_line(line: &str) -> Option<String> {
         Ok((value, level)) => Some(format!("<h{level}>{value}</h{level}>")),
         Err(_) => {
             if !line.is_empty() {
-                Some(format!("<p>{line}</p>"))
+                let (_, bold_parsed_line) =
+                    parse_bold_text(line).expect("[ ERROR ] Faced some bother parsing an MDX line");
+                Some(format!("<p>{bold_parsed_line}</p>"))
             } else {
                 None
             }
@@ -73,7 +108,19 @@ pub fn parse_mdx_file(_filename: &str) {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{parse_heading_text, parse_mdx_line};
+    use crate::parser::{
+        discard_leading_whitespace, parse_bold_segment, parse_bold_text, parse_heading_text,
+        parse_mdx_line, parse_up_to_bold_segment,
+    };
+
+    #[test]
+    pub fn test_discard_leading_whitespace() {
+        let mdx_line = "   NewTech was first set up to solve the common problem coming up for identifiers in computer science.  ";
+        assert_eq!(
+            discard_leading_whitespace(mdx_line),
+            Ok(("","NewTech was first set up to solve the common problem coming up for identifiers in computer science.  "))
+        );
+    }
 
     #[test]
     pub fn test_parse_mdx_line() {
@@ -109,5 +156,26 @@ mod tests {
             parse_heading_text(heading_mdx),
             Ok(("What Does All This Mean?", 3))
         );
+    }
+
+    #[test]
+    pub fn test_parse_bold_segment() {
+        let mdx_line = "first** set up to solve the common problem coming up for identifiers in computer science.";
+        assert_eq!(parse_bold_segment(mdx_line), Ok(("", ("first", " set up to solve the common problem coming up for identifiers in computer science."))));
+    }
+
+    #[test]
+    pub fn test_parse_up_to_bold_segment() {
+        let mdx_line = "NewTech was **first** set up to solve the common problem coming up for identifiers in computer science.";
+        assert_eq!(parse_up_to_bold_segment(mdx_line), Ok(("", ("NewTech was ", "first** set up to solve the common problem coming up for identifiers in computer science."))));
+    }
+
+    #[test]
+    pub fn test_parse_bold_text() {
+        let mdx_line = "NewTech was **first** set up to solve the **common problem** coming up for identifiers in computer science.";
+        assert_eq!(parse_bold_text(mdx_line), Ok(("", String::from("NewTech was <strong>first</strong> set up to solve the <strong>common problem</strong> coming up for identifiers in computer science."))));
+
+        let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
+        assert_eq!(parse_bold_text(mdx_line), Ok(("", String::from("NewTech was first set up to solve the common problem coming up for identifiers in computer science."))));
     }
 }
