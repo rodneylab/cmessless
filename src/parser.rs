@@ -17,20 +17,21 @@ fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
 }
 
+fn segment_bold_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let (_, (initial_segment, remainder)) = parse_up_to_bold_segment(line)?;
+    let (_, (bold_segment, final_segment)) = parse_bold_segment(remainder)?;
+    Ok(("", (initial_segment, bold_segment, final_segment)))
+}
+
 fn parse_bold_text(line: &str) -> IResult<&str, String> {
-    let (first_segment, remainder) = match parse_up_to_bold_segment(line) {
-        Ok((_, (value1, value2))) => (value1, value2),
+    let (initial_segment, bold_segment, final_segment) = match segment_bold_line(line) {
+        Ok((_, (value_1, value_2, value_3))) => (value_1, value_2, value_3),
         Err(_) => return Ok(("", line.to_string())),
     };
-    let (bold_segment, final_segment): (&str, &str) = match parse_bold_segment(remainder) {
-        Ok((_, (value1, value2))) => (value1, value2),
-        Err(_) => return Ok(("", line.to_string())),
-    };
-    // recursive call to catch any remaining emphasised text in the line
     let (_, final_final_segment) = parse_bold_text(final_segment)?;
     Ok((
         "",
-        format!("{first_segment}<strong>{bold_segment}</strong>{final_final_segment}"),
+        format!("{initial_segment}<strong>{bold_segment}</strong>{final_final_segment}"),
     ))
 }
 
@@ -110,7 +111,7 @@ pub fn parse_mdx_file(_filename: &str) {
 mod tests {
     use crate::parser::{
         discard_leading_whitespace, parse_bold_segment, parse_bold_text, parse_heading_text,
-        parse_mdx_line, parse_up_to_bold_segment,
+        parse_mdx_line, parse_up_to_bold_segment, segment_bold_line,
     };
 
     #[test]
@@ -177,5 +178,11 @@ mod tests {
 
         let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
         assert_eq!(parse_bold_text(mdx_line), Ok(("", String::from("NewTech was first set up to solve the common problem coming up for identifiers in computer science."))));
+    }
+
+    #[test]
+    pub fn test_segment_bold_line() {
+        let mdx_line = "NewTech was **first** set up to solve the **common problem** coming up for identifiers in computer science.";
+        assert_eq!(segment_bold_line(mdx_line), Ok(("", ("NewTech was ", "first", " set up to solve the **common problem** coming up for identifiers in computer science."))));
     }
 }

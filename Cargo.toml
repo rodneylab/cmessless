@@ -12,3 +12,6 @@ homepage = "https://rodneylab.com"
 
 [dependencies]
 nom = "7.1.0"
+
+[profile.release]
+strip = "debuginfo"
