@@ -1,13 +1,14 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until},
+    bytes::complete::{tag, tag_no_case, take_until},
     character::complete::{multispace0, multispace1},
     combinator::rest,
-    multi::many1_count,
-    sequence::{preceded, separated_pair, terminated},
+    multi::{many0, many1_count},
+    sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
 };
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
@@ -29,6 +30,16 @@ pub fn author_name_from_cargo_pkg_authors() -> &'static str {
     }
 }
 
+fn segment_anchor_element_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let delimiter = "a";
+    let (remainder, initial_segment) = parse_up_to_opening_html_tag(line, delimiter)?;
+    let (final_segment, anchor_attributes_segment) = parse_opening_html_tag(remainder, delimiter)?;
+    Ok((
+        "",
+        (initial_segment, anchor_attributes_segment, final_segment),
+    ))
+}
+
 fn segment_code_span_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
     let delimiter = "`";
     let (_, (initial_segment, remainder)) = parse_up_to_inline_wrap_segment(line, delimiter)?;
@@ -48,6 +59,46 @@ fn segment_strong_emphasis_line(line: &str) -> IResult<&str, (&str, &str, &str)>
     let (_, (initial_segment, remainder)) = parse_up_to_inline_wrap_segment(line, delimiter)?;
     let (_, (bold_segment, final_segment)) = parse_inline_wrap_segment(remainder, delimiter)?;
     Ok(("", (initial_segment, bold_segment, final_segment)))
+}
+
+fn parse_html_tag_attribute(line: &str) -> IResult<&str, (&str, &str)> {
+    tuple((
+        preceded(multispace0, take_until("=")),
+        delimited(tag("=\""), take_until("\""), tag("\"")),
+    ))(line)
+}
+
+fn parse_html_tag_attributes(attributes: &str) -> IResult<&str, Vec<(&str, &str)>> {
+    many0(parse_html_tag_attribute)(attributes)
+}
+
+fn parse_href_scheme(href: &str) -> IResult<&str, &str> {
+    alt((tag_no_case("HTTP://"), tag_no_case("HTTPS://")))(href)
+}
+
+fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
+    let (_, (initial_segment, anchor_attributes_segment, final_segment)) =
+        segment_anchor_element_line(line)?;
+    let (_, attributes_vector) = parse_html_tag_attributes(anchor_attributes_segment)?;
+
+    let attributes_hash_map: HashMap<&str, &str> = attributes_vector.into_iter().collect();
+    let href = attributes_hash_map["href"];
+    let external_site = parse_href_scheme(href).is_ok();
+    let mut additional_attributes = String::new();
+
+    if external_site {
+        if !attributes_hash_map.contains_key("target") {
+            additional_attributes.push_str(" target=\"_blank\"");
+        }
+        if !attributes_hash_map.contains_key("rel") {
+            additional_attributes.push_str(" rel=\"nofollow noopener noreferrer\"");
+        }
+    }
+
+    Ok((
+        final_segment,
+        format!("{initial_segment}<a {anchor_attributes_segment}{additional_attributes}>"),
+    ))
 }
 
 fn form_code_span_line(line: &str) -> IResult<&str, String> {
@@ -79,6 +130,7 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
         form_strong_emphasis_line,
         form_emphasis_line,
         form_code_span_line,
+        form_html_anchor_element_line,
     ))(line)
     {
         Ok((value_1, value_2)) => (value_2, value_1),
@@ -89,6 +141,7 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
     Ok(("", format!("{initial_segment}{final_final_segment}")))
 }
 
+// consumes delimiter
 fn parse_up_to_inline_wrap_segment<'a>(
     line: &'a str,
     delimiter: &'a str,
@@ -96,6 +149,27 @@ fn parse_up_to_inline_wrap_segment<'a>(
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
+fn parse_up_to_opening_html_tag<'a>(
+    line: &'a str,
+    element_tag: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(element_tag);
+    let result = take_until(delimiter.as_str())(line);
+    result
+}
+
+fn parse_opening_html_tag<'a>(line: &'a str, element_tag: &'a str) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(element_tag);
+    delimited(
+        tag("<a"),
+        delimited(multispace0, take_until(">"), multispace0),
+        tag(">"),
+    )(line)
+}
+
+// consumes delimiter
 fn parse_inline_wrap_segment<'a>(
     line: &'a str,
     delimiter: &'a str,
@@ -159,9 +233,15 @@ pub fn parse_mdx_file(_filename: &str) {
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        discard_leading_whitespace, form_code_span_line, parse_heading_text,
-        parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
-        parse_up_to_inline_wrap_segment, segment_emphasis_line, segment_strong_emphasis_line,
+        discard_leading_whitespace, form_code_span_line, form_html_anchor_element_line,
+        parse_heading_text, parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
+        parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line, parse_opening_html_tag,
+        parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
+        segment_strong_emphasis_line,
+    };
+    use nom::{
+        error::{Error, ErrorKind},
+        Err,
     };
 
     #[test]
@@ -174,12 +254,73 @@ mod tests {
     }
 
     #[test]
+    pub fn test_form_html_anchor_element_line() {
+        // adds rel and target attributes for external sites when they are not already there
+        let mdx_line = "<a href=\"https://www.example.com\">site</a>.";
+        assert_eq!(
+            form_html_anchor_element_line(mdx_line),
+            Ok((
+                "site</a>.",
+                String::from(
+                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">"
+                )
+            ))
+        );
+
+        // does not add rel and target attributes to non external sites
+        let mdx_line = "<a href=\"/home/contact-us\">site</a>.";
+        assert_eq!(
+            form_html_anchor_element_line(mdx_line),
+            Ok(("site</a>.", String::from("<a href=\"/home/contact-us\">")))
+        );
+    }
+
+    #[test]
     pub fn test_form_code_span_line() {
         let mdx_line = "NewTech `console.log(\"made it here\")` first set up to solve the common problem coming up for identifiers in computer science.";
         assert_eq!(
             form_code_span_line(mdx_line),
             Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
         );
+    }
+
+    #[test]
+    pub fn test_parse_href_scheme() {
+        let href = "https://example.com/home";
+        assert_eq!(
+            parse_href_scheme(href),
+            Ok(("example.com/home", "https://"))
+        );
+
+        let href = "/home";
+        assert_eq!(
+            parse_href_scheme(href),
+            Err(Err::Error(Error::new(href, ErrorKind::Tag)))
+        );
+    }
+
+    #[test]
+    pub fn test_parse_html_tag_attribute() {
+        let attribute = "href=\"https://example.com\"";
+        assert_eq!(
+            parse_html_tag_attribute(attribute),
+            Ok(("", ("href", "https://example.com")))
+        );
+
+        let attribute = "aria-label=\"Open our website homepage\"";
+        assert_eq!(
+            parse_html_tag_attribute(attribute),
+            Ok(("", ("aria-label", "Open our website homepage")))
+        );
+    }
+
+    #[test]
+    pub fn test_parse_html_tag_attributes() {
+        let attributes = "href=\"https://example.com\" target=\"_blank\"";
+        let (_, result) = parse_html_tag_attributes(attributes).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], ("href", "https://example.com"));
+        assert_eq!(result[1], ("target", "_blank"));
     }
 
     #[test]
@@ -240,6 +381,27 @@ mod tests {
 
         let mdx_line = "NewTech was first set up to *solve* the common problem coming up for identifiers in *computer* science.";
         assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("NewTech was first set up to <em>solve</em> the common problem coming up for identifiers in <em>computer</em> science."))));
+    }
+
+    #[test]
+    pub fn test_parse_opening_html_tag() {
+        let mdx_line = "<a href=\"https://www.example.com\">site</a>.";
+        assert_eq!(
+            parse_opening_html_tag(mdx_line, "a"),
+            Ok(("site</a>.", ("href=\"https://www.example.com\"")))
+        );
+    }
+
+    #[test]
+    pub fn test_parse_up_to_opening_html_tag() {
+        let mdx_line = "Visit our new <a href=\"https://www.example.com\">site</a>.";
+        assert_eq!(
+            parse_up_to_opening_html_tag(mdx_line, "a"),
+            Ok((
+                "<a href=\"https://www.example.com\">site</a>.",
+                ("Visit our new ")
+            ))
+        );
     }
 
     #[test]
