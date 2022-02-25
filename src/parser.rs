@@ -1,4 +1,5 @@
 use nom::{
+    branch::alt,
     bytes::complete::{tag, take_until},
     character::complete::{multispace0, multispace1},
     combinator::rest,
@@ -17,32 +18,6 @@ fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
 }
 
-fn segment_bold_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
-    let (_, (initial_segment, remainder)) = parse_up_to_bold_segment(line)?;
-    let (_, (bold_segment, final_segment)) = parse_bold_segment(remainder)?;
-    Ok(("", (initial_segment, bold_segment, final_segment)))
-}
-
-fn parse_bold_text(line: &str) -> IResult<&str, String> {
-    let (initial_segment, bold_segment, final_segment) = match segment_bold_line(line) {
-        Ok((_, (value_1, value_2, value_3))) => (value_1, value_2, value_3),
-        Err(_) => return Ok(("", line.to_string())),
-    };
-    let (_, final_final_segment) = parse_bold_text(final_segment)?;
-    Ok((
-        "",
-        format!("{initial_segment}<strong>{bold_segment}</strong>{final_final_segment}"),
-    ))
-}
-
-fn parse_up_to_bold_segment(line: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(take_until("**"), tag("**"), rest)(line)
-}
-
-fn parse_bold_segment(line: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(take_until("**"), tag("**"), rest)(line)
-}
-
 fn parse_author_name_from_cargo_pkg_authors(cargo_pkg_authors: &str) -> IResult<&str, &str> {
     take_until(" <")(cargo_pkg_authors)
 }
@@ -52,6 +27,80 @@ pub fn author_name_from_cargo_pkg_authors() -> &'static str {
         Ok((_, result)) => result,
         Err(_) => panic!("[ ERROR ] Authors does not seem to be defined!"),
     }
+}
+
+fn segment_code_span_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let delimiter = "`";
+    let (_, (initial_segment, remainder)) = parse_up_to_inline_wrap_segment(line, delimiter)?;
+    let (_, (bold_segment, final_segment)) = parse_inline_wrap_segment(remainder, delimiter)?;
+    Ok(("", (initial_segment, bold_segment, final_segment)))
+}
+
+fn segment_emphasis_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let delimiter = "*";
+    let (_, (initial_segment, remainder)) = parse_up_to_inline_wrap_segment(line, delimiter)?;
+    let (_, (bold_segment, final_segment)) = parse_inline_wrap_segment(remainder, delimiter)?;
+    Ok(("", (initial_segment, bold_segment, final_segment)))
+}
+
+fn segment_strong_emphasis_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let delimiter = "**";
+    let (_, (initial_segment, remainder)) = parse_up_to_inline_wrap_segment(line, delimiter)?;
+    let (_, (bold_segment, final_segment)) = parse_inline_wrap_segment(remainder, delimiter)?;
+    Ok(("", (initial_segment, bold_segment, final_segment)))
+}
+
+fn form_code_span_line(line: &str) -> IResult<&str, String> {
+    let (_, (initial_segment, bold_segment, final_segment)) = segment_code_span_line(line)?;
+    Ok((
+        final_segment,
+        format!("{initial_segment}<code>{bold_segment}</code>"),
+    ))
+}
+
+fn form_emphasis_line(line: &str) -> IResult<&str, String> {
+    let (_, (initial_segment, bold_segment, final_segment)) = segment_emphasis_line(line)?;
+    Ok((
+        final_segment,
+        format!("{initial_segment}<em>{bold_segment}</em>"),
+    ))
+}
+
+fn form_strong_emphasis_line(line: &str) -> IResult<&str, String> {
+    let (_, (initial_segment, bold_segment, final_segment)) = segment_strong_emphasis_line(line)?;
+    Ok((
+        final_segment,
+        format!("{initial_segment}<strong>{bold_segment}</strong>"),
+    ))
+}
+
+fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
+    let (initial_segment, final_segment): (String, &str) = match alt((
+        form_strong_emphasis_line,
+        form_emphasis_line,
+        form_code_span_line,
+    ))(line)
+    {
+        Ok((value_1, value_2)) => (value_2, value_1),
+        Err(_) => return Ok(("", line.to_string())),
+    };
+
+    let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
+    Ok(("", format!("{initial_segment}{final_final_segment}")))
+}
+
+fn parse_up_to_inline_wrap_segment<'a>(
+    line: &'a str,
+    delimiter: &'a str,
+) -> IResult<&'a str, (&'a str, &'a str)> {
+    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
+}
+
+fn parse_inline_wrap_segment<'a>(
+    line: &'a str,
+    delimiter: &'a str,
+) -> IResult<&'a str, (&'a str, &'a str)> {
+    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
 fn parse_heading_text(line: &str) -> IResult<&str, usize> {
@@ -64,8 +113,8 @@ fn parse_mdx_line(line: &str) -> Option<String> {
         Ok((value, level)) => Some(format!("<h{level}>{value}</h{level}>")),
         Err(_) => {
             if !line.is_empty() {
-                let (_, bold_parsed_line) =
-                    parse_bold_text(line).expect("[ ERROR ] Faced some bother parsing an MDX line");
+                let (_, bold_parsed_line) = parse_inline_wrap_text(line)
+                    .expect("[ ERROR ] Faced some bother parsing an MDX line");
                 Some(format!("<p>{bold_parsed_line}</p>"))
             } else {
                 None
@@ -110,8 +159,9 @@ pub fn parse_mdx_file(_filename: &str) {
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        discard_leading_whitespace, parse_bold_segment, parse_bold_text, parse_heading_text,
-        parse_mdx_line, parse_up_to_bold_segment, segment_bold_line,
+        discard_leading_whitespace, form_code_span_line, parse_heading_text,
+        parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
+        parse_up_to_inline_wrap_segment, segment_emphasis_line, segment_strong_emphasis_line,
     };
 
     #[test]
@@ -120,6 +170,15 @@ mod tests {
         assert_eq!(
             discard_leading_whitespace(mdx_line),
             Ok(("","NewTech was first set up to solve the common problem coming up for identifiers in computer science.  "))
+        );
+    }
+
+    #[test]
+    pub fn test_form_code_span_line() {
+        let mdx_line = "NewTech `console.log(\"made it here\")` first set up to solve the common problem coming up for identifiers in computer science.";
+        assert_eq!(
+            form_code_span_line(mdx_line),
+            Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
         );
     }
 
@@ -160,29 +219,48 @@ mod tests {
     }
 
     #[test]
-    pub fn test_parse_bold_segment() {
+    pub fn test_parse_inline_wrap_segment() {
         let mdx_line = "first** set up to solve the common problem coming up for identifiers in computer science.";
-        assert_eq!(parse_bold_segment(mdx_line), Ok(("", ("first", " set up to solve the common problem coming up for identifiers in computer science."))));
+        assert_eq!(parse_inline_wrap_segment(mdx_line, "**"), Ok(("", ("first", " set up to solve the common problem coming up for identifiers in computer science."))));
     }
 
     #[test]
-    pub fn test_parse_up_to_bold_segment() {
+    pub fn test_parse_up_to_inline_wrap_segment() {
         let mdx_line = "NewTech was **first** set up to solve the common problem coming up for identifiers in computer science.";
-        assert_eq!(parse_up_to_bold_segment(mdx_line), Ok(("", ("NewTech was ", "first** set up to solve the common problem coming up for identifiers in computer science."))));
+        assert_eq!(parse_up_to_inline_wrap_segment(mdx_line, "**"), Ok(("", ("NewTech was ", "first** set up to solve the common problem coming up for identifiers in computer science."))));
     }
 
     #[test]
-    pub fn test_parse_bold_text() {
+    pub fn test_parse_inline_wrap_text() {
         let mdx_line = "NewTech was **first** set up to solve the **common problem** coming up for identifiers in computer science.";
-        assert_eq!(parse_bold_text(mdx_line), Ok(("", String::from("NewTech was <strong>first</strong> set up to solve the <strong>common problem</strong> coming up for identifiers in computer science."))));
+        assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("NewTech was <strong>first</strong> set up to solve the <strong>common problem</strong> coming up for identifiers in computer science."))));
 
         let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
-        assert_eq!(parse_bold_text(mdx_line), Ok(("", String::from("NewTech was first set up to solve the common problem coming up for identifiers in computer science."))));
+        assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("NewTech was first set up to solve the common problem coming up for identifiers in computer science."))));
+
+        let mdx_line = "NewTech was first set up to *solve* the common problem coming up for identifiers in *computer* science.";
+        assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("NewTech was first set up to <em>solve</em> the common problem coming up for identifiers in <em>computer</em> science."))));
     }
 
     #[test]
-    pub fn test_segment_bold_line() {
+    pub fn test_segment_strong_emphasis_line() {
         let mdx_line = "NewTech was **first** set up to solve the **common problem** coming up for identifiers in computer science.";
-        assert_eq!(segment_bold_line(mdx_line), Ok(("", ("NewTech was ", "first", " set up to solve the **common problem** coming up for identifiers in computer science."))));
+        assert_eq!(segment_strong_emphasis_line(mdx_line), Ok(("", ("NewTech was ", "first", " set up to solve the **common problem** coming up for identifiers in computer science."))));
+    }
+
+    #[test]
+    pub fn test_segment_emphasis_line() {
+        let mdx_line = "NewTech was first set up to *solve* the common problem coming up for identifiers in *computer* science.";
+        assert_eq!(
+            segment_emphasis_line(mdx_line),
+            Ok((
+                "",
+                (
+                    "NewTech was first set up to ",
+                    "solve",
+                    " the common problem coming up for identifiers in *computer* science."
+                )
+            ))
+        );
     }
 }
