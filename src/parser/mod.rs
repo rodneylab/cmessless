@@ -31,28 +31,30 @@ enum ListType {
 }
 
 struct ListStack {
-    stack: Vec<ListType>,
+    structure: Vec<ListType>,
 }
 
 impl ListStack {
     fn new() -> Self {
-        ListStack { stack: Vec::new() }
+        ListStack {
+            structure: Vec::new(),
+        }
     }
 
     fn pop(&mut self) -> Option<ListType> {
-        self.stack.pop()
+        self.structure.pop()
     }
 
     fn push(&mut self, element: ListType) {
-        self.stack.push(element)
+        self.structure.push(element)
     }
 
     fn len(&self) -> usize {
-        self.stack.len()
+        self.structure.len()
     }
 
     fn is_empty(&self) -> bool {
-        self.stack.is_empty()
+        self.structure.is_empty()
     }
 }
 
