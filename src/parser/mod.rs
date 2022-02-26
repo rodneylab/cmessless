@@ -24,6 +24,38 @@ enum LineType {
     Paragraph,
 }
 
+#[derive(Debug, PartialEq)]
+enum ListType {
+    // Ordered,
+    Unordered,
+}
+
+struct ListStack {
+    stack: Vec<ListType>,
+}
+
+impl ListStack {
+    fn new() -> Self {
+        ListStack { stack: Vec::new() }
+    }
+
+    fn pop(&mut self) -> Option<ListType> {
+        self.stack.pop()
+    }
+
+    fn push(&mut self, element: ListType) {
+        self.stack.push(element)
+    }
+
+    fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+}
+
 #[allow(dead_code)]
 fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
@@ -261,35 +293,43 @@ pub fn parse_mdx_file(_filename: &str) {
     let reader = BufReader::new(file);
 
     let mut current_indentation: usize = 0;
-    let mut open_unordered_list_item_depth = 0;
+    let mut open_lists = ListStack::new();
 
     for line in reader.lines() {
         let line_content = line.unwrap();
         match parse_mdx_line(&line_content) {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::ListItem => {
-                    if open_unordered_list_item_depth == 0 {
-                        open_unordered_list_item_depth = 1;
-                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
-                        tokens.push(format!("<ul>\n{list_item_indentation}{line}"));
+                    if open_lists.is_empty() {
+                        open_lists.push(ListType::Unordered);
+                        tokens.push(format!("<ul>\n  {line}"));
                     } else if indentation > current_indentation {
-                        open_unordered_list_item_depth += 1;
-                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
+                        open_lists.push(ListType::Unordered);
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("<ul>\n{list_item_indentation}{line}"));
                     } else if indentation == current_indentation {
-                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("{list_item_indentation}{line}"));
                     } else {
-                        open_unordered_list_item_depth -= 1;
+                        while open_lists.pop() != Some(ListType::Unordered) {
+                            tokens.push(String::from("</ol>"));
+                        }
+                        tokens.push(String::from("</ul>"));
                     }
                     current_indentation = indentation
                 }
                 _ => tokens.push(line),
             },
             None => {
-                while open_unordered_list_item_depth != 0 {
-                    tokens.push(String::from("</ul>"));
-                    open_unordered_list_item_depth -= 1;
+                while !open_lists.is_empty() {
+                    if let Some(ListType::Unordered) = open_lists.pop() {
+                        tokens.push(String::from("</ul>"))
+                    };
+                    // match open_lists.pop() {
+                    //     Some(ListType::Unordered) => tokens.push(String::from("</ul>")),
+                    //     Some(ListType::Ordered) => tokens.push(String::from("</ol>")),
+                    //     None => {}
+                    // }
                 }
             }
         };
