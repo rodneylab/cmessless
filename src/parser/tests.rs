@@ -1,9 +1,9 @@
 use crate::parser::{
     discard_leading_whitespace, form_code_span_line, form_html_anchor_element_line,
-    parse_heading_text, parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
-    parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line, parse_opening_html_tag,
-    parse_unordered_list_text, parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag,
-    segment_emphasis_line, segment_strong_emphasis_line, LineType,
+    form_inline_wrap_text, parse_heading_text, parse_href_scheme, parse_html_tag_attribute,
+    parse_html_tag_attributes, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
+    parse_opening_html_tag, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
+    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -48,6 +48,23 @@ pub fn test_form_code_span_line() {
             form_code_span_line(mdx_line),
             Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
         );
+}
+
+#[test]
+pub fn test_form_inline_wrap_text() {
+    // does not create paragraph tags for empty line
+    let mdx_line = "";
+    assert_eq!(
+        form_inline_wrap_text(mdx_line),
+        Ok(("", (String::from(""), LineType::Paragraph, 0)))
+    );
+
+    // adds paragraph tags for non-empty line
+    let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
+    assert_eq!(
+        form_inline_wrap_text(mdx_line),
+        Ok(("", (String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"), LineType::Paragraph, 0)))
+    );
 }
 
 #[test]
