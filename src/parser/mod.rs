@@ -6,7 +6,7 @@ use nom::{
     bytes::complete::{tag, tag_no_case, take_until},
     character::complete::{multispace0, multispace1},
     combinator::rest,
-    multi::{many0, many1_count},
+    multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
 };
@@ -16,6 +16,13 @@ use std::{
     io::{BufRead, BufReader, Write},
     path::Path,
 };
+
+#[derive(Debug, PartialEq)]
+enum LineType {
+    Heading,
+    ListItem,
+    Paragraph,
+}
 
 #[allow(dead_code)]
 fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
@@ -172,6 +179,11 @@ fn parse_opening_html_tag<'a>(line: &'a str, element_tag: &'a str) -> IResult<&'
     )(line)
 }
 
+fn parse_heading_text(line: &str) -> IResult<&str, usize> {
+    let (heading, level) = terminated(many1_count(tag("#")), multispace1)(line)?;
+    Ok((heading, level))
+}
+
 // consumes delimiter
 fn parse_inline_wrap_segment<'a>(
     line: &'a str,
@@ -180,24 +192,61 @@ fn parse_inline_wrap_segment<'a>(
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
-fn parse_heading_text(line: &str) -> IResult<&str, usize> {
-    let (heading, level) = terminated(many1_count(tag("#")), multispace1)(line)?;
-    Ok((heading, level))
+fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
+    let (heading, indentation) = terminated(many0_count(tag(" ")), tag("- "))(line)?;
+    Ok((heading, indentation))
 }
 
-fn form_heading_line(line: &str) -> IResult<&str, String> {
+fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (value, level) = parse_heading_text(line)?;
-    Ok(("", format!("<h{level}>{value}</h{level}>")))
+    Ok((
+        "",
+        (
+            format!("<h{level}>{value}</h{level}>"),
+            LineType::Heading,
+            level,
+        ),
+    ))
 }
 
-fn form_inline_wrap_text(line: &str) -> IResult<&str, String> {
+fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (list_text, indentation) = parse_unordered_list_text(line)?;
+    Ok((
+        "",
+        (
+            format!("<li>{list_text}</li>"),
+            LineType::ListItem,
+            indentation,
+        ),
+    ))
+}
+
+fn form_inline_wrap_text(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_, parsed_line) = parse_inline_wrap_text(line)?;
-    Ok(("", format!("<p>{parsed_line}</p>")))
+    if !parsed_line.is_empty() {
+        Ok((
+            "",
+            (format!("<p>{parsed_line}</p>"), LineType::Paragraph, 0),
+        ))
+    } else {
+        Ok(("", (String::new(), LineType::Paragraph, 0)))
+    }
 }
 
-fn parse_mdx_line(line: &str) -> Option<String> {
-    match alt((form_heading_line, form_inline_wrap_text))(line) {
-        Ok((_, value)) => Some(value),
+fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
+    match alt((
+        form_heading_line,
+        form_unordered_list_line,
+        form_inline_wrap_text,
+    ))(line)
+    {
+        Ok((_, (line, line_type, level))) => {
+            if !line.is_empty() {
+                Some((line, line_type, level))
+            } else {
+                None
+            }
+        }
         Err(_) => None,
     }
 }
@@ -211,13 +260,40 @@ pub fn parse_mdx_file(_filename: &str) {
     let mut tokens: Vec<String> = Vec::new();
     let reader = BufReader::new(file);
 
+    let mut current_indentation: usize = 0;
+    let mut open_unordered_list_item_depth = 0;
+
     for line in reader.lines() {
         let line_content = line.unwrap();
-        if let Some(value) = parse_mdx_line(&line_content) {
-            tokens.push(value)
-        }
+        match parse_mdx_line(&line_content) {
+            Some((line, line_type, indentation)) => match line_type {
+                LineType::ListItem => {
+                    if open_unordered_list_item_depth == 0 {
+                        open_unordered_list_item_depth = 1;
+                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
+                        tokens.push(format!("<ul>\n{list_item_indentation}{line}"));
+                    } else if indentation > current_indentation {
+                        open_unordered_list_item_depth += 1;
+                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
+                        tokens.push(format!("<ul>\n{list_item_indentation}{line}"));
+                    } else if indentation == current_indentation {
+                        let list_item_indentation = " ".repeat(2 * open_unordered_list_item_depth);
+                        tokens.push(format!("{list_item_indentation}{line}"));
+                    } else {
+                        open_unordered_list_item_depth -= 1;
+                    }
+                    current_indentation = indentation
+                }
+                _ => tokens.push(line),
+            },
+            None => {
+                while open_unordered_list_item_depth != 0 {
+                    tokens.push(String::from("</ul>"));
+                    open_unordered_list_item_depth -= 1;
+                }
+            }
+        };
     }
-
     for token in &tokens {
         println!("{token}");
     }
