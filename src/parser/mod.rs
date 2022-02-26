@@ -185,18 +185,20 @@ fn parse_heading_text(line: &str) -> IResult<&str, usize> {
     Ok((heading, level))
 }
 
+fn form_heading_line(line: &str) -> IResult<&str, String> {
+    let (value, level) = parse_heading_text(line)?;
+    Ok(("", format!("<h{level}>{value}</h{level}>")))
+}
+
+fn form_inline_wrap_text(line: &str) -> IResult<&str, String> {
+    let (_, parsed_line) = parse_inline_wrap_text(line)?;
+    Ok(("", format!("<p>{parsed_line}</p>")))
+}
+
 fn parse_mdx_line(line: &str) -> Option<String> {
-    match parse_heading_text(line) {
-        Ok((value, level)) => Some(format!("<h{level}>{value}</h{level}>")),
-        Err(_) => {
-            if !line.is_empty() {
-                let (_, bold_parsed_line) = parse_inline_wrap_text(line)
-                    .expect("[ ERROR ] Faced some bother parsing an MDX line");
-                Some(format!("<p>{bold_parsed_line}</p>"))
-            } else {
-                None
-            }
-        }
+    match alt((form_heading_line, form_inline_wrap_text))(line) {
+        Ok((_, value)) => Some(value),
+        Err(_) => None,
     }
 }
 
