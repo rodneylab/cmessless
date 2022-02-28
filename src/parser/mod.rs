@@ -11,18 +11,38 @@ use nom::{
     IResult,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
 };
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum JSXComponentType {
+    CodeFragment,
+    Image,
+    Poll,
+    Questions,
+    Tweet,
+    Video,
+}
+
 #[derive(Debug, PartialEq)]
 enum LineType {
+    CodeFragmentOpen,
+    CodeFragmentClose,
+    JSXComponent,
     Heading,
+    Image,
     OrderedListItem,
     Paragraph,
+    PollOpen,
+    PollClose,
+    Questions,
+    Tweet,
     UnorderedListItem,
+    VideoOpen,
+    VideoClose,
 }
 
 #[derive(Debug, PartialEq)]
@@ -73,6 +93,24 @@ pub fn author_name_from_cargo_pkg_authors() -> &'static str {
         Ok((_, result)) => result,
         Err(_) => panic!("[ ERROR ] Authors does not seem to be defined!"),
     }
+}
+
+// consumes delimiter
+fn parse_up_to_inline_wrap_segment<'a>(
+    line: &'a str,
+    delimiter: &'a str,
+) -> IResult<&'a str, (&'a str, &'a str)> {
+    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
+}
+
+fn parse_up_to_opening_html_tag<'a>(
+    line: &'a str,
+    element_tag: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(element_tag);
+    let result = take_until(delimiter.as_str())(line);
+    result
 }
 
 fn segment_anchor_element_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
@@ -154,6 +192,141 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     ))
 }
 
+fn parse_jsx_component<'a>(
+    line: &'a str,
+    component_identifier: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(component_identifier);
+    let result = delimited(tag(delimiter.as_str()), take_until("/>"), tag("/>"))(line);
+    result
+}
+
+fn parse_jsx_component_first_line<'a>(
+    line: &'a str,
+    component_identifier: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(component_identifier);
+    let result = tag(delimiter.as_str())(line);
+    result
+}
+
+fn parse_jsx_component_last_line<'a>(
+    line: &'a str,
+    component_identifier: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("</");
+    delimiter.push_str(component_identifier);
+    let result = tag(delimiter.as_str())(line);
+    result
+}
+
+fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "CodeFragment";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_first_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::CodeFragmentOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_image_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Image";
+    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
+    Ok(("", (format!("<Image{attributes}/>"), LineType::Image, 0)))
+}
+
+fn form_tweet_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Tweet";
+    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
+    Ok(("", (format!("<Tweet{attributes}/>"), LineType::Tweet, 0)))
+}
+
+fn form_poll_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Poll";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_first_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::PollOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Questions";
+    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
+    Ok((
+        "",
+        (format!("<Questions{attributes}/>"), LineType::Questions, 0),
+    ))
+}
+
+fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Video";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_first_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::VideoOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "CodeFragment";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_last_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::CodeFragmentClose,
+            0,
+        ),
+    ))
+}
+
+fn form_poll_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Poll";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_last_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::PollClose,
+            0,
+        ),
+    ))
+}
+
+fn form_video_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "Video";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_last_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::VideoClose,
+            0,
+        ),
+    ))
+}
+
 fn form_emphasis_line(line: &str) -> IResult<&str, String> {
     let (_, (initial_segment, bold_segment, final_segment)) = segment_emphasis_line(line)?;
     Ok((
@@ -184,24 +357,6 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 
     let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
     Ok(("", format!("{initial_segment}{final_final_segment}")))
-}
-
-// consumes delimiter
-fn parse_up_to_inline_wrap_segment<'a>(
-    line: &'a str,
-    delimiter: &'a str,
-) -> IResult<&'a str, (&'a str, &'a str)> {
-    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
-}
-
-fn parse_up_to_opening_html_tag<'a>(
-    line: &'a str,
-    element_tag: &'a str,
-) -> IResult<&'a str, &'a str> {
-    let delimiter = &mut String::from("<");
-    delimiter.push_str(element_tag);
-    let result = take_until(delimiter.as_str())(line);
-    result
 }
 
 fn parse_opening_html_tag<'a>(line: &'a str, element_tag: &'a str) -> IResult<&'a str, &'a str> {
@@ -286,22 +441,107 @@ fn form_inline_wrap_text(line: &str) -> IResult<&str, (String, LineType, usize)>
     }
 }
 
-fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
-    match alt((
-        form_heading_line,
-        form_ordered_list_line,
-        form_unordered_list_line,
-        form_inline_wrap_text,
-    ))(line)
-    {
-        Ok((_, (line, line_type, level))) => {
-            if !line.is_empty() {
-                Some((line, line_type, level))
-            } else {
-                None
+fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    let mut define_slug = false;
+    let mut image_data_imports: Vec<String> = Vec::new();
+
+    result.push(String::from("---"));
+    if components.contains(&JSXComponentType::CodeFragment) {
+        result.push(String::from(
+            "import CodeFragment from '$components/CodeFragment.tsx';",
+        ));
+    }
+    if components.contains(&JSXComponentType::Image) {
+        image_data_imports.push(String::from("imageProps"));
+        result.push(String::from(
+            "import Image from '$components/BlogPost/Image.svelte';",
+        ));
+        result.push(format!("import imageData from '$generated/blog/{slug}';"));
+    }
+    if components.contains(&JSXComponentType::Poll) {
+        result.push(String::from("import Poll from '$components/Poll.svelte';"));
+    }
+    if components.contains(&JSXComponentType::Questions) {
+        result.push(String::from(
+            "import Poll from '$components/Questions.svelte'",
+        ));
+    }
+    if components.contains(&JSXComponentType::Tweet) {
+        result.push(String::from(
+            "import Tweet from '$components/Tweet.svelte';",
+        ));
+    }
+    if components.contains(&JSXComponentType::Video) {
+        define_slug = true;
+        image_data_imports.push(String::from("poster"));
+        result.push(String::from(
+            "import Video from '$components/Video.svelte';",
+        ));
+    }
+
+    if !image_data_imports.is_empty() {
+        let mut line = format!("\nconst {{ {}", image_data_imports[0]);
+        for import in &image_data_imports[1..] {
+            line.push_str(", ");
+            line.push_str(import.as_str());
+        }
+        line.push_str(" } = imageData");
+        result.push(line);
+    }
+    if define_slug {
+        result.push(format!("\nconst slug = '{slug}';"));
+    }
+    result.push(String::from("---\n"));
+    result
+}
+
+fn parse_mdx_line(
+    line: &str,
+    open_jsx_component_type: &Option<JSXComponentType>,
+) -> Option<(String, LineType, usize)> {
+    match open_jsx_component_type {
+        Some(_) => {
+            match alt((
+                form_code_fragment_component_last_line,
+                form_poll_component_last_line,
+                form_video_component_last_line,
+            ))(line)
+            {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
             }
         }
-        Err(_) => None,
+        None => {
+            match alt((
+                form_code_fragment_component_first_line,
+                form_image_component,
+                form_poll_component_first_line,
+                form_questions_component,
+                form_tweet_component,
+                form_video_component_first_line,
+                form_heading_line,
+                form_ordered_list_line,
+                form_unordered_list_line,
+                form_inline_wrap_text,
+            ))(line)
+            {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => None,
+            }
+        }
     }
 }
 
@@ -310,16 +550,33 @@ pub fn parse_mdx_file(_filename: &str) {
 
     let input_filename = Path::new(_filename);
     let file = File::open(&input_filename).expect("[ ERROR ] Couldn't open that file!");
+    let slug = match input_filename
+        .file_stem()
+        .expect("[ ERROR ] Couldn't open that file!")
+        .to_str()
+    {
+        Some(value) => match value {
+            "index" => &input_filename
+                .parent()
+                .expect("[ ERROR ] Couldn't open that file!")
+                .to_str()
+                .expect("[ ERROR ] Couldn't open that file!")[1..],
+            other => other,
+        },
+        None => panic!("[ ERROR ] Couldn't open that file!"),
+    };
 
     let mut tokens: Vec<String> = Vec::new();
     let reader = BufReader::new(file);
 
     let mut current_indentation: usize = 0;
     let mut open_lists = ListStack::new();
+    let mut open_jsx_component_type: Option<JSXComponentType> = None;
+    let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
     for line in reader.lines() {
         let line_content = line.unwrap();
-        match parse_mdx_line(&line_content) {
+        match parse_mdx_line(&line_content, &open_jsx_component_type) {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::OrderedListItem => {
                     if open_lists.is_empty() {
@@ -359,13 +616,41 @@ pub fn parse_mdx_file(_filename: &str) {
                     }
                     current_indentation = indentation
                 }
+                LineType::CodeFragmentClose | LineType::PollClose | LineType::VideoClose => {
+                    open_jsx_component_type = None;
+                    tokens.push(line);
+                }
+                LineType::Image => {
+                    present_jsx_component_types.insert(JSXComponentType::Image);
+                    tokens.push(line);
+                }
+                LineType::Questions => {
+                    present_jsx_component_types.insert(JSXComponentType::Questions);
+                    tokens.push(line);
+                }
+                LineType::Tweet => {
+                    present_jsx_component_types.insert(JSXComponentType::Tweet);
+                    tokens.push(line);
+                }
+                LineType::CodeFragmentOpen => {
+                    present_jsx_component_types.insert(JSXComponentType::CodeFragment);
+                    open_jsx_component_type = Some(JSXComponentType::CodeFragment);
+                    tokens.push(line);
+                }
+                LineType::PollOpen => {
+                    present_jsx_component_types.insert(JSXComponentType::Poll);
+                    open_jsx_component_type = Some(JSXComponentType::Poll);
+                    tokens.push(line);
+                }
+                LineType::VideoOpen => {
+                    present_jsx_component_types.insert(JSXComponentType::Video);
+                    open_jsx_component_type = Some(JSXComponentType::Video);
+                    tokens.push(line);
+                }
                 _ => tokens.push(line),
             },
             None => {
                 while !open_lists.is_empty() {
-                    // if let Some(ListType::Unordered) = open_lists.pop() {
-                    //     tokens.push(String::from("</ul>"))
-                    // };
                     match open_lists.pop() {
                         Some(ListType::Unordered) => tokens.push(String::from("</ul>")),
                         Some(ListType::Ordered) => tokens.push(String::from("</ol>")),
@@ -375,18 +660,33 @@ pub fn parse_mdx_file(_filename: &str) {
             }
         };
     }
+    let astro_frontmatter = form_astro_frontmatter(&present_jsx_component_types, slug);
+    for frontmatter_line in &astro_frontmatter {
+        println!("{frontmatter_line}");
+    }
     for token in &tokens {
         println!("{token}");
     }
 
     let mut output_filename = String::from(&_filename[.._filename.len() - 3]);
-    output_filename.push_str("html");
+    output_filename.push_str("astro");
     let mut outfile =
         File::create(output_filename).expect("[ ERROR ] Was not able to create the output file!");
 
+    for line in &astro_frontmatter {
+        outfile
+            .write_all(line.as_bytes())
+            .expect("[ ERROR ] Was not able to create the output file!");
+        outfile
+            .write_all(b"\n")
+            .expect("[ ERROR ] Was not able to create the output file!");
+    }
     for line in &tokens {
         outfile
             .write_all(line.as_bytes())
+            .expect("[ ERROR ] Was not able to create the output file!");
+        outfile
+            .write_all(b"\n")
             .expect("[ ERROR ] Was not able to create the output file!");
     }
     println!("[ INFO ] Parsing complete!")

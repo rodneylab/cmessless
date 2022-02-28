@@ -1,7 +1,8 @@
 use crate::parser::{
-    discard_leading_whitespace, form_code_span_line, form_html_anchor_element_line,
-    form_inline_wrap_text, parse_heading_text, parse_href_scheme, parse_html_tag_attribute,
-    parse_html_tag_attributes, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
+    discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
+    form_html_anchor_element_line, form_inline_wrap_text, parse_heading_text, parse_href_scheme,
+    parse_html_tag_attribute, parse_html_tag_attributes, parse_inline_wrap_segment,
+    parse_inline_wrap_text, parse_jsx_component, parse_jsx_component_first_line, parse_mdx_line,
     parse_opening_html_tag, parse_ordered_list_text, parse_unordered_list_text,
     parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
     segment_strong_emphasis_line, LineType,
@@ -18,6 +19,31 @@ pub fn test_discard_leading_whitespace() {
             discard_leading_whitespace(mdx_line),
             Ok(("","NewTech was first set up to solve the common problem coming up for identifiers in computer science.  "))
         );
+}
+
+#[test]
+pub fn test_form_code_fragment_component_first_line() {
+    let mdx_line = "<CodeFragment";
+    assert_eq!(
+        form_code_fragment_component_first_line(mdx_line),
+        Ok((
+            "",
+            (String::from("<CodeFragment"), LineType::CodeFragmentOpen, 0)
+        ))
+    );
+
+    let mdx_line = "<CodeFragment>";
+    assert_eq!(
+        form_code_fragment_component_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<CodeFragment>"),
+                LineType::CodeFragmentOpen,
+                0
+            )
+        ))
+    );
 }
 
 #[test]
@@ -108,10 +134,34 @@ pub fn test_parse_html_tag_attributes() {
 }
 
 #[test]
+pub fn test_parse_jsx_component() {
+    let mdx_line = "<Questions {questions} />";
+    assert_eq!(
+        parse_jsx_component(mdx_line, "Questions"),
+        Ok(("", " {questions} "))
+    );
+}
+
+#[test]
+pub fn test_parse_jsx_component_first_line() {
+    let mdx_line = "<CodeFragment";
+    assert_eq!(
+        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
+        Ok(("", "<CodeFragment"))
+    );
+
+    let mdx_line = "<CodeFragment>";
+    assert_eq!(
+        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
+        Ok((">", "<CodeFragment"))
+    );
+}
+
+#[test]
 pub fn test_parse_mdx_line() {
     let mdx_line = "# Getting Started with NewTech  ";
     assert_eq!(
-        parse_mdx_line(mdx_line),
+        parse_mdx_line(mdx_line, &None),
         Some((
             String::from("<h1>Getting Started with NewTech  </h1>"),
             LineType::Heading,
@@ -121,7 +171,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "### What Does All This Mean?";
     assert_eq!(
-        parse_mdx_line(mdx_line),
+        parse_mdx_line(mdx_line, &None),
         Some((
             String::from("<h3>What Does All This Mean?</h3>"),
             LineType::Heading,
@@ -131,7 +181,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
-            parse_mdx_line(mdx_line),
+            parse_mdx_line(mdx_line, &None),
             Some((String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"),
                 LineType::Paragraph, 0))
         );
