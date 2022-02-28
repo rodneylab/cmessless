@@ -2,8 +2,9 @@ use crate::parser::{
     discard_leading_whitespace, form_code_span_line, form_html_anchor_element_line,
     form_inline_wrap_text, parse_heading_text, parse_href_scheme, parse_html_tag_attribute,
     parse_html_tag_attributes, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
-    parse_opening_html_tag, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, LineType,
+    parse_opening_html_tag, parse_ordered_list_text, parse_unordered_list_text,
+    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
+    segment_strong_emphasis_line, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -182,6 +183,21 @@ pub fn test_parse_opening_html_tag() {
     assert_eq!(
         parse_opening_html_tag(mdx_line, "a"),
         Ok(("site</a>.", ("href=\"https://www.example.com\"")))
+    );
+}
+
+#[test]
+pub fn test_parse_ordered_list_text() {
+    let list_line_mdx = "1. first of all  ";
+    assert_eq!(
+        parse_ordered_list_text(list_line_mdx),
+        Ok(("first of all  ", 0))
+    );
+
+    let list_line_mdx = "  1. first of all  ";
+    assert_eq!(
+        parse_ordered_list_text(list_line_mdx),
+        Ok(("first of all  ", 2))
     );
 }
 

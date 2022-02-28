@@ -4,7 +4,7 @@ mod tests;
 use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until},
-    character::complete::{multispace0, multispace1},
+    character::complete::{digit1, multispace0, multispace1},
     combinator::rest,
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
@@ -20,13 +20,14 @@ use std::{
 #[derive(Debug, PartialEq)]
 enum LineType {
     Heading,
-    ListItem,
+    OrderedListItem,
     Paragraph,
+    UnorderedListItem,
 }
 
 #[derive(Debug, PartialEq)]
 enum ListType {
-    // Ordered,
+    Ordered,
     Unordered,
 }
 
@@ -226,6 +227,12 @@ fn parse_inline_wrap_segment<'a>(
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
+fn parse_ordered_list_text(line: &str) -> IResult<&str, usize> {
+    let (heading, indentation) =
+        terminated(many0_count(tag(" ")), preceded(digit1, tag(". ")))(line)?;
+    Ok((heading, indentation))
+}
+
 fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
     let (heading, indentation) = terminated(many0_count(tag(" ")), tag("- "))(line)?;
     Ok((heading, indentation))
@@ -243,13 +250,25 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     ))
 }
 
+fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (list_text, indentation) = parse_ordered_list_text(line)?;
+    Ok((
+        "",
+        (
+            format!("<li>{list_text}</li>"),
+            LineType::OrderedListItem,
+            indentation,
+        ),
+    ))
+}
+
 fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (list_text, indentation) = parse_unordered_list_text(line)?;
     Ok((
         "",
         (
             format!("<li>{list_text}</li>"),
-            LineType::ListItem,
+            LineType::UnorderedListItem,
             indentation,
         ),
     ))
@@ -270,6 +289,7 @@ fn form_inline_wrap_text(line: &str) -> IResult<&str, (String, LineType, usize)>
 fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
     match alt((
         form_heading_line,
+        form_ordered_list_line,
         form_unordered_list_line,
         form_inline_wrap_text,
     ))(line)
@@ -301,7 +321,26 @@ pub fn parse_mdx_file(_filename: &str) {
         let line_content = line.unwrap();
         match parse_mdx_line(&line_content) {
             Some((line, line_type, indentation)) => match line_type {
-                LineType::ListItem => {
+                LineType::OrderedListItem => {
+                    if open_lists.is_empty() {
+                        open_lists.push(ListType::Ordered);
+                        tokens.push(format!("<ol>\n  {line}"));
+                    } else if indentation > current_indentation {
+                        open_lists.push(ListType::Ordered);
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
+                        tokens.push(format!("<ol>\n{list_item_indentation}{line}"));
+                    } else if indentation == current_indentation {
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
+                        tokens.push(format!("{list_item_indentation}{line}"));
+                    } else {
+                        while open_lists.pop() != Some(ListType::Ordered) {
+                            tokens.push(String::from("</ul>"));
+                        }
+                        tokens.push(String::from("</ol>"));
+                    }
+                    current_indentation = indentation
+                }
+                LineType::UnorderedListItem => {
                     if open_lists.is_empty() {
                         open_lists.push(ListType::Unordered);
                         tokens.push(format!("<ul>\n  {line}"));
@@ -324,14 +363,14 @@ pub fn parse_mdx_file(_filename: &str) {
             },
             None => {
                 while !open_lists.is_empty() {
-                    if let Some(ListType::Unordered) = open_lists.pop() {
-                        tokens.push(String::from("</ul>"))
-                    };
-                    // match open_lists.pop() {
-                    //     Some(ListType::Unordered) => tokens.push(String::from("</ul>")),
-                    //     Some(ListType::Ordered) => tokens.push(String::from("</ol>")),
-                    //     None => {}
-                    // }
+                    // if let Some(ListType::Unordered) = open_lists.pop() {
+                    //     tokens.push(String::from("</ul>"))
+                    // };
+                    match open_lists.pop() {
+                        Some(ListType::Unordered) => tokens.push(String::from("</ul>")),
+                        Some(ListType::Ordered) => tokens.push(String::from("</ol>")),
+                        None => {}
+                    }
                 }
             }
         };
