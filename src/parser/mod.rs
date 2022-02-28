@@ -406,11 +406,13 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
 }
 
 fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    // let (list_text, indentation) = parse_ordered_list_text(line)?;
     let (list_text, indentation) = parse_ordered_list_text(line)?;
+    let (_, parsed_list_text) = parse_inline_wrap_text(list_text)?;
     Ok((
         "",
         (
-            format!("<li>{list_text}</li>"),
+            format!("<li>{parsed_list_text}</li>"),
             LineType::OrderedListItem,
             indentation,
         ),

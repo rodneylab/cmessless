@@ -1,11 +1,11 @@
 use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
-    form_html_anchor_element_line, form_inline_wrap_text, parse_heading_text, parse_href_scheme,
-    parse_html_tag_attribute, parse_html_tag_attributes, parse_inline_wrap_segment,
-    parse_inline_wrap_text, parse_jsx_component, parse_jsx_component_first_line, parse_mdx_line,
-    parse_opening_html_tag, parse_ordered_list_text, parse_unordered_list_text,
-    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
-    segment_strong_emphasis_line, LineType,
+    form_html_anchor_element_line, form_inline_wrap_text, form_ordered_list_line,
+    parse_heading_text, parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
+    parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
+    parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
+    parse_ordered_list_text, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
+    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -91,6 +91,36 @@ pub fn test_form_inline_wrap_text() {
     assert_eq!(
         form_inline_wrap_text(mdx_line),
         Ok(("", (String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"), LineType::Paragraph, 0)))
+    );
+}
+
+#[test]
+pub fn test_form_ordered_list_line() {
+    // does not create paragraph tags for empty line
+    let mdx_line = "1. first things first";
+    assert_eq!(
+        form_ordered_list_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<li>first things first</li>"),
+                LineType::OrderedListItem,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "1. first things **before** second things";
+    assert_eq!(
+        form_ordered_list_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<li>first things <strong>before</strong> second things</li>"),
+                LineType::OrderedListItem,
+                0
+            )
+        ))
     );
 }
 
