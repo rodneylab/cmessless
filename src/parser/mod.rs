@@ -5,7 +5,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until},
     character::complete::{digit1, multispace0, multispace1},
-    combinator::rest,
+    combinator::{map, rest},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -25,6 +25,13 @@ enum JSXComponentType {
     Questions,
     Tweet,
     Video,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum JSXTagType {
+    SelfClosed,
+    Opened,
+    Closed,
 }
 
 #[derive(Debug, PartialEq)]
@@ -205,11 +212,25 @@ fn parse_jsx_component<'a>(
 fn parse_jsx_component_first_line<'a>(
     line: &'a str,
     component_identifier: &'a str,
-) -> IResult<&'a str, &'a str> {
-    let delimiter = &mut String::from("<");
-    delimiter.push_str(component_identifier);
-    let result = tag(delimiter.as_str())(line);
-    result
+) -> IResult<&'a str, (&'a str, &'a JSXTagType)> {
+    let left_delimiter = &mut String::from("<");
+    left_delimiter.push_str(component_identifier);
+
+    let result = alt((
+        map(
+            delimited(tag(left_delimiter.as_str()), take_until("/>"), tag("/>")),
+            |value: &str| (value, &JSXTagType::SelfClosed),
+        ),
+        map(
+            delimited(tag(left_delimiter.as_str()), take_until(">"), tag(">")),
+            |value: &str| (value, &JSXTagType::Closed),
+        ),
+        map(
+            preceded(tag(left_delimiter.as_str()), rest),
+            |value: &str| (value, &JSXTagType::Opened),
+        ),
+    ))(line)?;
+    Ok(result)
 }
 
 fn parse_jsx_component_last_line<'a>(
@@ -224,16 +245,34 @@ fn parse_jsx_component_last_line<'a>(
 
 fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "CodeFragment";
-    let (final_segment, initial_segment) =
+    let (final_segment, (initial_segment, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::CodeFragmentOpen,
-            0,
-        ),
-    ))
+    match jsx_tag_type {
+        JSXTagType::Closed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}>"),
+                LineType::CodeFragmentOpen,
+                0,
+            ),
+        )),
+        JSXTagType::Opened => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}"),
+                LineType::CodeFragmentOpen,
+                0,
+            ),
+        )),
+        JSXTagType::SelfClosed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
+                LineType::CodeFragmentOpen,
+                0,
+            ),
+        )),
+    }
 }
 
 fn form_image_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -250,16 +289,34 @@ fn form_tweet_component(line: &str) -> IResult<&str, (String, LineType, usize)> 
 
 fn form_poll_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Poll";
-    let (final_segment, initial_segment) =
+    let (final_segment, (initial_segment, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::PollOpen,
-            0,
-        ),
-    ))
+    match jsx_tag_type {
+        JSXTagType::Closed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}>"),
+                LineType::PollOpen,
+                0,
+            ),
+        )),
+        JSXTagType::Opened => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}"),
+                LineType::PollOpen,
+                0,
+            ),
+        )),
+        JSXTagType::SelfClosed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
+                LineType::PollOpen,
+                0,
+            ),
+        )),
+    }
 }
 
 fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -273,16 +330,34 @@ fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usiz
 
 fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Video";
-    let (final_segment, initial_segment) =
+    let (final_segment, (initial_segment, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::VideoOpen,
-            0,
-        ),
-    ))
+    match jsx_tag_type {
+        JSXTagType::Closed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}>"),
+                LineType::VideoOpen,
+                0,
+            ),
+        )),
+        JSXTagType::Opened => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}"),
+                LineType::VideoOpen,
+                0,
+            ),
+        )),
+        JSXTagType::SelfClosed => Ok((
+            "",
+            (
+                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
+                LineType::VideoOpen,
+                0,
+            ),
+        )),
+    }
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {

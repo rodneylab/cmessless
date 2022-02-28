@@ -5,7 +5,8 @@ use crate::parser::{
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
     parse_ordered_list_text, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, LineType,
+    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, JSXTagType,
+    LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -32,13 +33,26 @@ pub fn test_form_code_fragment_component_first_line() {
         ))
     );
 
-    let mdx_line = "<CodeFragment>";
+    let mdx_line = "<CodeFragment count={3} >";
     assert_eq!(
         form_code_fragment_component_first_line(mdx_line),
         Ok((
             "",
             (
-                String::from("<CodeFragment>"),
+                String::from("<CodeFragment count={3} >"),
+                LineType::CodeFragmentOpen,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "<CodeFragment count={3} />";
+    assert_eq!(
+        form_code_fragment_component_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<CodeFragment count={3} />"),
                 LineType::CodeFragmentOpen,
                 0
             )
@@ -177,13 +191,19 @@ pub fn test_parse_jsx_component_first_line() {
     let mdx_line = "<CodeFragment";
     assert_eq!(
         parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", "<CodeFragment"))
+        Ok(("", ("", &JSXTagType::Opened)))
     );
 
-    let mdx_line = "<CodeFragment>";
+    let mdx_line = "<CodeFragment count={3} >";
     assert_eq!(
         parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok((">", "<CodeFragment"))
+        Ok(("", (" count={3} ", &JSXTagType::Closed)))
+    );
+
+    let mdx_line = "<CodeFragment count={3} />";
+    assert_eq!(
+        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
+        Ok(("", (" count={3} ", &JSXTagType::SelfClosed)))
     );
 }
 
