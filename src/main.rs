@@ -1,12 +1,31 @@
 mod parser;
 
-use ::watchexec::{
+use clap::Parser;
+use std::path::Path;
+use watchexec::{
     config::{Config, ConfigBuilder},
     error::Result,
     pathop::PathOp,
     run::{watch, ExecHandler, Handler},
 };
+
 use parser::{author_name_from_cargo_pkg_authors, parse_mdx_file};
+
+#[derive(Parser)]
+#[clap(author,version,about,long_about=None)]
+struct Cli {
+    path: std::path::PathBuf,
+
+    #[clap(parse(from_os_str))]
+    #[clap(short = 'o', long = "output")]
+    output: std::path::PathBuf,
+
+    #[clap(short, long)]
+    verbose: bool,
+
+    #[clap(short, long)]
+    watch: bool,
+}
 
 fn get_title() -> String {
     let mut the_title = String::from(env!("CARGO_PKG_NAME"));
@@ -32,10 +51,6 @@ fn print_long_banner() {
     println!("       {} --watch <somefile>.mdx", env!("CARGO_PKG_NAME"));
 }
 
-fn usage() {
-    print_long_banner();
-}
-
 struct CmslessHandler(ExecHandler);
 
 impl Handler for CmslessHandler {
@@ -54,12 +69,17 @@ impl Handler for CmslessHandler {
     }
 }
 
-fn parse_then_watch(mdx_path: &str) -> Result<()> {
+fn parse_then_watch(mdx_path: &Path, output_path: &Path) -> Result<()> {
     let config = ConfigBuilder::default()
         .clear_screen(true)
         .run_initially(true)
         .paths(vec![mdx_path.into()])
-        .cmd(vec!["./target/release/cmessless".into(), mdx_path.into()])
+        .cmd(vec![
+            "./target/release/cmessless".into(),
+            mdx_path.to_str().unwrap().into(),
+            "--output".into(),
+            output_path.to_str().unwrap().into(),
+        ])
         .build()
         .expect("[ ERROR ] Issue while configuring watchexec");
 
@@ -70,27 +90,18 @@ fn parse_then_watch(mdx_path: &str) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    match args.len() {
-        2 => {
-            print_short_banner();
-            parse_mdx_file(&args[1]);
-            Ok(())
-        }
-        3 => {
-            if args[1] == "--watch" {
-                print_short_banner();
-                return parse_then_watch(&args[2]);
-            } else {
-            }
-            println!("[ ERROR ] Invalid invocation (not at all sure what you want)");
-            usage();
-            Ok(())
-        }
-        _ => {
-            println!("[ ERROR ] Invalid invocation (not at all sure what you want)");
-            usage();
-            Ok(())
-        }
+    let cli = Cli::parse();
+
+    if cli.verbose {
+        print_long_banner();
+        return Ok(());
     }
+
+    print_short_banner();
+    if cli.watch {
+        return parse_then_watch(cli.path.as_path(), cli.output.as_path());
+    } else {
+        parse_mdx_file(cli.path.as_path(), cli.output.as_path());
+    }
+    Ok(())
 }
