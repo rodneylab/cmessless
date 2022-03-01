@@ -3,9 +3,9 @@ mod tests;
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, tag_no_case, take_until},
-    character::complete::{digit1, multispace0, multispace1},
-    combinator::{map, rest, value},
+    bytes::complete::{is_not, tag, tag_no_case, take_until},
+    character::complete::{alpha1, digit1, multispace0, multispace1},
+    combinator::{map, opt, peek, rest, value},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -17,10 +17,13 @@ use std::{
     path::Path,
 };
 
+type ParsedFencedCodeBlockMeta<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum JSXComponentType {
     CodeFragment,
     CodeFragmentOpening,
+    FencedCodeBlock,
     Image,
     Poll,
     Questions,
@@ -41,6 +44,8 @@ enum LineType {
     CodeFragment,
     CodeFragmentOpen,
     CodeFragmentOpening,
+    FencedCodeBlock,
+    FencedCodeBlockOpen,
     JSXComponent,
     Heading,
     Image,
@@ -213,6 +218,22 @@ fn parse_jsx_component<'a>(
     result
 }
 
+fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedCodeBlockMeta> {
+    let (meta, _) = tag("```")(line)?;
+    let (remaining_meta, language_option) =
+        opt(alt((terminated(take_until(" "), tag(" ")), alpha1)))(meta)?;
+    let (remaining_meta, highlight_lines_option) = opt(alt((
+        delimited(peek(tag("{")), is_not(" \t\r\n"), tag(" ")),
+        preceded(peek(tag("{")), is_not(" \t\r\n")),
+    )))(remaining_meta)?;
+    let (_, title_option) = opt(delimited(tag("\""), take_until("\""), tag("\"")))(remaining_meta)?;
+    Ok(("", (language_option, highlight_lines_option, title_option)))
+}
+
+fn parse_fenced_code_block_last_line(line: &str) -> IResult<&str, &str> {
+    tag("```")(line)
+}
+
 fn parse_jsx_component_first_line<'a>(
     line: &'a str,
     component_identifier: &'a str,
@@ -244,6 +265,30 @@ fn parse_jsx_component_last_line<'a>(
     delimiter.push_str(component_identifier);
     let result = tag(delimiter.as_str())(line);
     result
+}
+
+fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, (language_option, highlight_lines_option, title_option)) =
+        parse_fenced_code_block_first_line(line)?;
+
+    let mut markup = String::from("<CodeFragment\n  client:visible");
+    if let Some(value) = language_option {
+        markup.push_str("\n  language=\"");
+        markup.push_str(value);
+        markup.push('\"');
+    };
+    if let Some(value) = highlight_lines_option {
+        markup.push_str("\n  highlightLines=\"");
+        markup.push_str(value);
+        markup.push('\"');
+    };
+    if let Some(value) = title_option {
+        markup.push_str("\n  title=\"");
+        markup.push_str(value);
+        markup.push('\"');
+    };
+    markup.push_str(">\n  {`");
+    Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
 fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -309,6 +354,18 @@ fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineT
         map(rest, |_| LineType::VideoOpening),
     ))(line)?;
     Ok(("", (line.to_string(), line_type, 0)))
+}
+
+fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
+    Ok((
+        "",
+        (
+            String::from("  `}\n</CodeFragment>"),
+            LineType::FencedCodeBlock,
+            0,
+        ),
+    ))
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -538,6 +595,16 @@ fn parse_mdx_line(
             }
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
         },
+        Some(JSXComponentType::FencedCodeBlock) => match form_fenced_code_block_last_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
+        },
         Some(_) => {
             match alt((
                 form_code_fragment_component_last_line,
@@ -558,6 +625,7 @@ fn parse_mdx_line(
         None => {
             match alt((
                 form_code_fragment_component_first_line,
+                form_fenced_code_block_first_line,
                 form_image_component,
                 form_poll_component_first_line,
                 form_questions_component,
@@ -665,7 +733,7 @@ pub fn parse_mdx_file(_filename: &str) {
                     open_jsx_component_type = None;
                     tokens.push(line);
                 }
-                LineType::CodeFragment => {
+                LineType::FencedCodeBlock | LineType::CodeFragment => {
                     present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_type = None;
                     tokens.push(line);
@@ -682,13 +750,15 @@ pub fn parse_mdx_file(_filename: &str) {
                     present_jsx_component_types.insert(JSXComponentType::Tweet);
                     tokens.push(line);
                 }
+                LineType::FencedCodeBlockOpen => {
+                    open_jsx_component_type = Some(JSXComponentType::FencedCodeBlock);
+                    tokens.push(line);
+                }
                 LineType::CodeFragmentOpen => {
-                    // present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_type = Some(JSXComponentType::CodeFragment);
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpening => {
-                    // present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_type = Some(JSXComponentType::CodeFragmentOpening);
                     tokens.push(line);
                 }
@@ -698,7 +768,6 @@ pub fn parse_mdx_file(_filename: &str) {
                     tokens.push(line);
                 }
                 LineType::VideoOpen => {
-                    // present_jsx_component_types.insert(JSXComponentType::Video);
                     open_jsx_component_type = Some(JSXComponentType::Video);
                     tokens.push(line);
                 }

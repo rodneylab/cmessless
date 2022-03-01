@@ -1,7 +1,8 @@
 use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
-    form_html_anchor_element_line, form_inline_wrap_text, form_ordered_list_line,
-    parse_heading_text, parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
+    form_fenced_code_block_first_line, form_html_anchor_element_line, form_inline_wrap_text,
+    form_ordered_list_line, parse_fenced_code_block_first_line, parse_heading_text,
+    parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
     parse_ordered_list_text, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
@@ -58,6 +59,22 @@ pub fn test_form_code_fragment_component_first_line() {
             (
                 String::from("<CodeFragment count={3} />"),
                 LineType::CodeFragment,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_fenced_code_block_first_line() {
+    let mdx_line = "```plaintext {5,7} \".env\"";
+    assert_eq!(
+        form_fenced_code_block_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<CodeFragment\n  client:visible\n  language=\"plaintext\"\n  highlightLines=\"{5,7}\"\n  title=\".env\">\n  {`"),
+                LineType::FencedCodeBlockOpen,
                 0
             )
         ))
@@ -139,6 +156,27 @@ pub fn test_form_ordered_list_line() {
                 0
             )
         ))
+    );
+}
+
+#[test]
+pub fn test_parse_fenced_code_block_first_line() {
+    let mdx_line = "```plaintext {5,7} \".env\"";
+    assert_eq!(
+        parse_fenced_code_block_first_line(mdx_line),
+        Ok(("", (Some("plaintext"), Some("{5,7}"), Some(".env"))))
+    );
+
+    let mdx_line = "```plaintext";
+    assert_eq!(
+        parse_fenced_code_block_first_line(mdx_line),
+        Ok(("", (Some("plaintext"), None, None)))
+    );
+
+    let mdx_line = "```plaintext {5,7}";
+    assert_eq!(
+        parse_fenced_code_block_first_line(mdx_line),
+        Ok(("", (Some("plaintext"), Some("{5,7}"), None)))
     );
 }
 
