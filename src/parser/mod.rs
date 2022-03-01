@@ -5,7 +5,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until},
     character::complete::{digit1, multispace0, multispace1},
-    combinator::{map, rest},
+    combinator::{rest, value},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -215,19 +215,19 @@ fn parse_jsx_component_first_line<'a>(
 ) -> IResult<&'a str, (&'a str, &'a JSXTagType)> {
     let left_delimiter = &mut String::from("<");
     left_delimiter.push_str(component_identifier);
-
     let result = alt((
-        map(
+        value(
+            (line, &JSXTagType::SelfClosed),
             delimited(tag(left_delimiter.as_str()), take_until("/>"), tag("/>")),
-            |_| (line, &JSXTagType::SelfClosed),
         ),
-        map(
+        value(
+            (line, &JSXTagType::Closed),
             delimited(tag(left_delimiter.as_str()), take_until(">"), tag(">")),
-            |_| (line, &JSXTagType::Closed),
         ),
-        map(preceded(tag(left_delimiter.as_str()), rest), |_| {
-            (line, &JSXTagType::Opened)
-        }),
+        value(
+            (line, &JSXTagType::Opened),
+            preceded(tag(left_delimiter.as_str()), rest),
+        ),
     ))(line)?;
     Ok(result)
 }
