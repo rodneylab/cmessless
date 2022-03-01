@@ -15,6 +15,7 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
     path::Path,
+    time::Instant,
 };
 
 type ParsedFencedCodeBlockMeta<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
@@ -675,6 +676,7 @@ fn parse_mdx_line(
 
 pub fn parse_mdx_file(_filename: &str) {
     println!("[ INFO ] Trying to parse {}...", _filename);
+    let start = Instant::now();
 
     let input_filename = Path::new(_filename);
     let file = File::open(&input_filename).expect("[ ERROR ] Couldn't open that file!");
@@ -844,5 +846,10 @@ pub fn parse_mdx_file(_filename: &str) {
             .write_all(b"\n")
             .expect("[ ERROR ] Was not able to create the output file!");
     }
-    println!("[ INFO ] Parsing complete!")
+    let duration = start.elapsed();
+    let duration_milliseconds = duration.as_millis();
+    let duration_microseconds = duration.as_micros() - (duration_milliseconds * 1000);
+    let input_file = File::open(&input_filename).expect("[ ERROR ] Couldn't open that file!");
+    let file_size = input_file.metadata().unwrap().len() / 1000;
+    println!("\n[ INFO ] Parsing complete ({file_size} KB) in {duration_milliseconds}.{duration_microseconds:0>3} ms.");
 }
