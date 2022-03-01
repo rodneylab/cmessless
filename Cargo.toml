@@ -1,6 +1,6 @@
 [package]
 name = "cmessless"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Rodney Johnson <ask@rodneylab.com>"]
 edition = "2021"
 description = "A markdown parser to output Astro markup."
