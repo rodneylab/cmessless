@@ -191,19 +191,19 @@ pub fn test_parse_jsx_component_first_line() {
     let mdx_line = "<CodeFragment";
     assert_eq!(
         parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", ("", &JSXTagType::Opened)))
+        Ok(("", ("<CodeFragment", &JSXTagType::Opened)))
     );
 
     let mdx_line = "<CodeFragment count={3} >";
     assert_eq!(
         parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", (" count={3} ", &JSXTagType::Closed)))
+        Ok(("", ("<CodeFragment count={3} >", &JSXTagType::Closed)))
     );
 
     let mdx_line = "<CodeFragment count={3} />";
     assert_eq!(
         parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", (" count={3} ", &JSXTagType::SelfClosed)))
+        Ok(("", ("<CodeFragment count={3} />", &JSXTagType::SelfClosed)))
     );
 }
 

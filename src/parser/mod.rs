@@ -219,16 +219,15 @@ fn parse_jsx_component_first_line<'a>(
     let result = alt((
         map(
             delimited(tag(left_delimiter.as_str()), take_until("/>"), tag("/>")),
-            |value: &str| (value, &JSXTagType::SelfClosed),
+            |_| (line, &JSXTagType::SelfClosed),
         ),
         map(
             delimited(tag(left_delimiter.as_str()), take_until(">"), tag(">")),
-            |value: &str| (value, &JSXTagType::Closed),
+            |_| (line, &JSXTagType::Closed),
         ),
-        map(
-            preceded(tag(left_delimiter.as_str()), rest),
-            |value: &str| (value, &JSXTagType::Opened),
-        ),
+        map(preceded(tag(left_delimiter.as_str()), rest), |_| {
+            (line, &JSXTagType::Opened)
+        }),
     ))(line)?;
     Ok(result)
 }
@@ -245,33 +244,12 @@ fn parse_jsx_component_last_line<'a>(
 
 fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "CodeFragment";
-    let (final_segment, (initial_segment, jsx_tag_type)) =
+    let (_, (_parsed_value, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
-        JSXTagType::Closed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}>"),
-                LineType::CodeFragmentOpen,
-                0,
-            ),
-        )),
-        JSXTagType::Opened => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}"),
-                LineType::CodeFragmentOpen,
-                0,
-            ),
-        )),
-        JSXTagType::SelfClosed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
-                LineType::CodeFragmentOpen,
-                0,
-            ),
-        )),
+        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
     }
 }
 
@@ -289,33 +267,12 @@ fn form_tweet_component(line: &str) -> IResult<&str, (String, LineType, usize)> 
 
 fn form_poll_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Poll";
-    let (final_segment, (initial_segment, jsx_tag_type)) =
+    let (_, (_parsed_value, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
-        JSXTagType::Closed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}>"),
-                LineType::PollOpen,
-                0,
-            ),
-        )),
-        JSXTagType::Opened => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}"),
-                LineType::PollOpen,
-                0,
-            ),
-        )),
-        JSXTagType::SelfClosed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
-                LineType::PollOpen,
-                0,
-            ),
-        )),
+        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
     }
 }
 
@@ -330,33 +287,12 @@ fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usiz
 
 fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Video";
-    let (final_segment, (initial_segment, jsx_tag_type)) =
+    let (_, (__parsed_value_, jsx_tag_type)) =
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
-        JSXTagType::Closed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}>"),
-                LineType::VideoOpen,
-                0,
-            ),
-        )),
-        JSXTagType::Opened => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}"),
-                LineType::VideoOpen,
-                0,
-            ),
-        )),
-        JSXTagType::SelfClosed => Ok((
-            "",
-            (
-                format!("<{component_identifier}{initial_segment}{final_segment}/>"),
-                LineType::VideoOpen,
-                0,
-            ),
-        )),
+        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
     }
 }
 
