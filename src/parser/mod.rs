@@ -273,7 +273,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
     let (_, (language_option, highlight_lines_option, title_option)) =
         parse_fenced_code_block_first_line(line)?;
 
-    let mut markup = String::from("<CodeFragment\n  client:visible");
+    let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
     if let Some(value) = language_option {
         markup.push_str("\n  language=\"");
         markup.push_str(value);
@@ -289,7 +289,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str(value);
         markup.push('\"');
     };
-    markup.push_str(">\n  {`");
+    markup.push_str(">\n  {`\n  <!--");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
@@ -374,7 +374,7 @@ fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineTy
     Ok((
         "",
         (
-            String::from("  `}\n</CodeFragment>"),
+            String::from("  -->\n  `}\n</CodeFragment>"),
             LineType::FencedCodeBlock,
             0,
         ),
@@ -550,7 +550,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         ));
     }
     if components.contains(&JSXComponentType::Image) {
-        image_data_imports.push(String::from("imageProps"));
+        image_data_imports.push(String::from("image: imageProps"));
         result.push(String::from(
             "import Image from '$components/BlogPost/Image.svelte';",
         ));
@@ -583,7 +583,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
             line.push_str(", ");
             line.push_str(import.as_str());
         }
-        line.push_str(" } = imageData");
+        line.push_str(" } = imageData;");
         result.push(line);
     }
     if define_slug {
