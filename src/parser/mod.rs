@@ -5,7 +5,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case, take_until},
     character::complete::{digit1, multispace0, multispace1},
-    combinator::{rest, value},
+    combinator::{map, rest, value},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -20,11 +20,13 @@ use std::{
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum JSXComponentType {
     CodeFragment,
+    CodeFragmentOpening,
     Image,
     Poll,
     Questions,
     Tweet,
     Video,
+    VideoOpening,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -36,20 +38,22 @@ enum JSXTagType {
 
 #[derive(Debug, PartialEq)]
 enum LineType {
+    CodeFragment,
     CodeFragmentOpen,
-    CodeFragmentClose,
+    CodeFragmentOpening,
     JSXComponent,
     Heading,
     Image,
     OrderedListItem,
     Paragraph,
     PollOpen,
-    PollClose,
+    Poll,
     Questions,
     Tweet,
     UnorderedListItem,
+    Video,
     VideoOpen,
-    VideoClose,
+    VideoOpening,
 }
 
 #[derive(Debug, PartialEq)]
@@ -248,8 +252,8 @@ fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String,
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
         JSXTagType::Closed => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::CodeFragmentOpening, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::CodeFragment, 0))),
     }
 }
 
@@ -291,9 +295,20 @@ fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineTyp
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
         JSXTagType::Closed => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpening, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Video, 0))),
     }
+}
+
+fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, line_type) = alt((
+        map(terminated(take_until("/>"), tag("/>")), |_| LineType::Video),
+        map(terminated(take_until(">"), tag(">")), |_| {
+            LineType::VideoOpen
+        }),
+        map(rest, |_| LineType::VideoOpening),
+    ))(line)?;
+    Ok(("", (line.to_string(), line_type, 0)))
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -304,7 +319,7 @@ fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, 
         "",
         (
             format!("{initial_segment}{final_segment}"),
-            LineType::CodeFragmentClose,
+            LineType::CodeFragment,
             0,
         ),
     ))
@@ -318,7 +333,7 @@ fn form_poll_component_last_line(line: &str) -> IResult<&str, (String, LineType,
         "",
         (
             format!("{initial_segment}{final_segment}"),
-            LineType::PollClose,
+            LineType::Poll,
             0,
         ),
     ))
@@ -332,7 +347,7 @@ fn form_video_component_last_line(line: &str) -> IResult<&str, (String, LineType
         "",
         (
             format!("{initial_segment}{final_segment}"),
-            LineType::VideoClose,
+            LineType::Video,
             0,
         ),
     ))
@@ -513,6 +528,16 @@ fn parse_mdx_line(
     open_jsx_component_type: &Option<JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
     match open_jsx_component_type {
+        Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+        },
         Some(_) => {
             match alt((
                 form_code_fragment_component_last_line,
@@ -628,7 +653,20 @@ pub fn parse_mdx_file(_filename: &str) {
                     }
                     current_indentation = indentation
                 }
-                LineType::CodeFragmentClose | LineType::PollClose | LineType::VideoClose => {
+                LineType::Poll => {
+                    present_jsx_component_types.insert(JSXComponentType::Poll);
+
+                    open_jsx_component_type = None;
+                    tokens.push(line);
+                }
+                LineType::Video => {
+                    present_jsx_component_types.insert(JSXComponentType::Video);
+
+                    open_jsx_component_type = None;
+                    tokens.push(line);
+                }
+                LineType::CodeFragment => {
+                    present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_type = None;
                     tokens.push(line);
                 }
@@ -645,8 +683,13 @@ pub fn parse_mdx_file(_filename: &str) {
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpen => {
-                    present_jsx_component_types.insert(JSXComponentType::CodeFragment);
+                    // present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_type = Some(JSXComponentType::CodeFragment);
+                    tokens.push(line);
+                }
+                LineType::CodeFragmentOpening => {
+                    // present_jsx_component_types.insert(JSXComponentType::CodeFragment);
+                    open_jsx_component_type = Some(JSXComponentType::CodeFragmentOpening);
                     tokens.push(line);
                 }
                 LineType::PollOpen => {
@@ -655,8 +698,13 @@ pub fn parse_mdx_file(_filename: &str) {
                     tokens.push(line);
                 }
                 LineType::VideoOpen => {
-                    present_jsx_component_types.insert(JSXComponentType::Video);
+                    // present_jsx_component_types.insert(JSXComponentType::Video);
                     open_jsx_component_type = Some(JSXComponentType::Video);
+                    tokens.push(line);
+                }
+                LineType::VideoOpening => {
+                    // present_jsx_component_types.insert(JSXComponentType::Video);
+                    open_jsx_component_type = Some(JSXComponentType::VideoOpening);
                     tokens.push(line);
                 }
                 _ => tokens.push(line),

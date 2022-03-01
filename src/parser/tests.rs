@@ -29,7 +29,11 @@ pub fn test_form_code_fragment_component_first_line() {
         form_code_fragment_component_first_line(mdx_line),
         Ok((
             "",
-            (String::from("<CodeFragment"), LineType::CodeFragmentOpen, 0)
+            (
+                String::from("<CodeFragment"),
+                LineType::CodeFragmentOpening,
+                0
+            )
         ))
     );
 
@@ -53,7 +57,7 @@ pub fn test_form_code_fragment_component_first_line() {
             "",
             (
                 String::from("<CodeFragment count={3} />"),
-                LineType::CodeFragmentOpen,
+                LineType::CodeFragment,
                 0
             )
         ))
