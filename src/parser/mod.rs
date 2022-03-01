@@ -491,7 +491,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
     }
     if components.contains(&JSXComponentType::Questions) {
         result.push(String::from(
-            "import Poll from '$components/Questions.svelte'",
+            "import Questions from '$components/Questions.svelte'",
         ));
     }
     if components.contains(&JSXComponentType::Tweet) {
