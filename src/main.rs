@@ -29,6 +29,7 @@ fn print_long_banner() {
     );
     println!("Repo: {}", env!("CARGO_PKG_REPOSITORY"));
     println!("Usage: {} <somefile>.mdx", env!("CARGO_PKG_NAME"));
+    println!("       {} --watch <somefile>.mdx", env!("CARGO_PKG_NAME"));
 }
 
 fn usage() {
@@ -80,7 +81,10 @@ fn main() -> Result<()> {
             if args[1] == "--watch" {
                 print_short_banner();
                 return parse_then_watch(&args[2]);
+            } else {
             }
+            println!("[ ERROR ] Invalid invocation (not at all sure what you want)");
+            usage();
             Ok(())
         }
         _ => {
