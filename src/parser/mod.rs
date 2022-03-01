@@ -26,6 +26,7 @@ enum JSXComponentType {
     FencedCodeBlock,
     Image,
     Poll,
+    PollOpening,
     Questions,
     Tweet,
     Video,
@@ -51,8 +52,9 @@ enum LineType {
     Image,
     OrderedListItem,
     Paragraph,
-    PollOpen,
     Poll,
+    PollOpen,
+    PollOpening,
     Questions,
     Tweet,
     UnorderedListItem,
@@ -320,8 +322,8 @@ fn form_poll_component_first_line(line: &str) -> IResult<&str, (String, LineType
         parse_jsx_component_first_line(line, component_identifier)?;
     match jsx_tag_type {
         JSXTagType::Closed => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::PollOpening, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Poll, 0))),
     }
 }
 
@@ -343,6 +345,17 @@ fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineTyp
         JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpening, 0))),
         JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Video, 0))),
     }
+}
+
+fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, line_type) = alt((
+        map(terminated(take_until("/>"), tag("/>")), |_| LineType::Poll),
+        map(terminated(take_until(">"), tag(">")), |_| {
+            LineType::PollOpen
+        }),
+        map(rest, |_| LineType::PollOpening),
+    ))(line)?;
+    Ok(("", (line.to_string(), line_type, 0)))
 }
 
 fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -585,6 +598,16 @@ fn parse_mdx_line(
     open_jsx_component_type: &Option<JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
     match open_jsx_component_type {
+        Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+        },
         Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
             Ok((_, (line, line_type, level))) => {
                 if !line.is_empty() {
@@ -767,12 +790,15 @@ pub fn parse_mdx_file(_filename: &str) {
                     open_jsx_component_type = Some(JSXComponentType::Poll);
                     tokens.push(line);
                 }
+                LineType::PollOpening => {
+                    open_jsx_component_type = Some(JSXComponentType::PollOpening);
+                    tokens.push(line);
+                }
                 LineType::VideoOpen => {
                     open_jsx_component_type = Some(JSXComponentType::Video);
                     tokens.push(line);
                 }
                 LineType::VideoOpening => {
-                    // present_jsx_component_types.insert(JSXComponentType::Video);
                     open_jsx_component_type = Some(JSXComponentType::VideoOpening);
                     tokens.push(line);
                 }
