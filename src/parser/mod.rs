@@ -606,6 +606,9 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
             "import Tweet from '$components/Tweet.svelte';",
         ));
     }
+    result.push(String::from(
+        "import TwitterMessageLink from '$components/Link/TwitterMessageLink.svelte';",
+    ));
     if components.contains(&JSXComponentType::Video) {
         define_slug = true;
         image_data_imports.push(String::from("poster"));
