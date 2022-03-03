@@ -765,7 +765,7 @@ pub fn slug_from_input_file_path(path: &Path) -> &str {
 }
 
 pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
-    println!("[ INFO ] Trying to parse {:?}...", input_path);
+    println!("[ INFO ] Parsing {:?}...", input_path);
     let start = Instant::now();
 
     let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
