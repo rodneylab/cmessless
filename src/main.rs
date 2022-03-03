@@ -70,17 +70,18 @@ impl Handler for CmslessHandler {
 }
 
 fn parse_then_watch(mdx_path: &Path, output_path: &Path, verbose: bool) -> Result<()> {
-    let command = match verbose {
-        false => format!(
-            "cmessless {} --output {}",
-            mdx_path.to_string_lossy(),
-            output_path.to_string_lossy()
-        ),
-        true => format!(
+    let command = if verbose {
+        format!(
             "cmessless {} --verbose --output {}",
             mdx_path.to_string_lossy(),
             output_path.to_string_lossy()
-        ),
+        )
+    } else {
+        format!(
+            "cmessless {} --output {}",
+            mdx_path.to_string_lossy(),
+            output_path.to_string_lossy()
+        )
     };
     let config = ConfigBuilder::default()
         .clear_screen(true)
