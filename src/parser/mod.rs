@@ -712,6 +712,24 @@ pub fn parse_frontmatter(file: &File) -> usize {
     line_number
 }
 
+pub fn slug_from_input_file_path(path: &Path) -> &str {
+    match path
+        .file_stem()
+        .expect("[ ERROR ] Couldn't open that file!")
+        .to_str()
+    {
+        Some(value) => match value {
+            "index" => &path
+                .parent()
+                .expect("[ ERROR ] Couldn't open that file!")
+                .to_str()
+                .expect("[ ERROR ] Couldn't open that file!")[1..],
+            other => other,
+        },
+        None => panic!("[ ERROR ] Couldn't open that file!"),
+    }
+}
+
 pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     println!("[ INFO ] Trying to parse {:?}...", input_path);
     let start = Instant::now();
@@ -720,21 +738,22 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let frontmatter_end_line_number = parse_frontmatter(&file);
     let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
 
-    let slug = match input_path
-        .file_stem()
-        .expect("[ ERROR ] Couldn't open that file!")
-        .to_str()
-    {
-        Some(value) => match value {
-            "index" => &input_path
-                .parent()
-                .expect("[ ERROR ] Couldn't open that file!")
-                .to_str()
-                .expect("[ ERROR ] Couldn't open that file!")[1..],
-            other => other,
-        },
-        None => panic!("[ ERROR ] Couldn't open that file!"),
-    };
+    let slug = slug_from_input_file_path(input_path);
+    // let slug = match input_path
+    //     .file_stem()
+    //     .expect("[ ERROR ] Couldn't open that file!")
+    //     .to_str()
+    // {
+    //     Some(value) => match value {
+    //         "index" => &input_path
+    //             .parent()
+    //             .expect("[ ERROR ] Couldn't open that file!")
+    //             .to_str()
+    //             .expect("[ ERROR ] Couldn't open that file!")[1..],
+    //         other => other,
+    //     },
+    //     None => panic!("[ ERROR ] Couldn't open that file!"),
+    // };
 
     let mut tokens: Vec<String> = Vec::new();
     let reader = BufReader::new(&file);
