@@ -589,7 +589,6 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         result.push(String::from(
             "import Image from '$components/BlogPost/Image.svelte';",
         ));
-        result.push(format!("import imageData from '$generated/blog/{slug}';"));
     }
     if components.contains(&JSXComponentType::Poll) {
         result.push(String::from("import Poll from '$components/Poll.svelte';"));
@@ -610,6 +609,11 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         result.push(String::from(
             "import Video from '$components/Video.svelte';",
         ));
+    }
+    if components.contains(&JSXComponentType::Image)
+        || components.contains(&JSXComponentType::Video)
+    {
+        result.push(format!("import imageData from '$generated/blog/{slug}';"));
     }
 
     if !image_data_imports.is_empty() {
