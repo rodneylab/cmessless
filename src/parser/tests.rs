@@ -79,6 +79,19 @@ pub fn test_form_fenced_code_block_first_line() {
             )
         ))
     );
+
+    let mdx_line = "```plaintext 2 {5,7} \".env\"";
+    assert_eq!(
+        form_fenced_code_block_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines=\"{5,7}\"\n  title=\".env\">\n  {`\n  <!--"),
+                LineType::FencedCodeBlockOpen,
+                0
+            )
+        ))
+    );
 }
 
 #[test]
@@ -180,19 +193,25 @@ pub fn test_parse_fenced_code_block_first_line() {
     let mdx_line = "```plaintext {5,7} \".env\"";
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
-        Ok(("", (Some("plaintext"), Some("{5,7}"), Some(".env"))))
+        Ok(("", (Some("plaintext"), None, Some("{5,7}"), Some(".env"))))
     );
 
     let mdx_line = "```plaintext";
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
-        Ok(("", (Some("plaintext"), None, None)))
+        Ok(("", (Some("plaintext"), None, None, None)))
     );
 
     let mdx_line = "```plaintext {5,7}";
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
-        Ok(("", (Some("plaintext"), Some("{5,7}"), None)))
+        Ok(("", (Some("plaintext"), None, Some("{5,7}"), None)))
+    );
+
+    let mdx_line = "```plaintext 2 {5,7}";
+    assert_eq!(
+        parse_fenced_code_block_first_line(mdx_line),
+        Ok(("", (Some("plaintext"), Some("2"), Some("{5,7}"), None)))
     );
 }
 

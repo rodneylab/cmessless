@@ -18,7 +18,12 @@ use std::{
     time::Instant,
 };
 
-type ParsedFencedCodeBlockMeta<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+type ParsedFencedCodeBlockMeta<'a> = (
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+);
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum JSXComponentType {
@@ -229,12 +234,22 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
     let (meta, _) = tag("```")(line)?;
     let (remaining_meta, language_option) =
         opt(alt((terminated(take_until(" "), tag(" ")), alpha1)))(meta)?;
+    let (remaining_meta, first_line_number_option) =
+        opt(alt((terminated(digit1, tag(" ")), digit1)))(remaining_meta)?;
     let (remaining_meta, highlight_lines_option) = opt(alt((
         delimited(peek(tag("{")), is_not(" \t\r\n"), tag(" ")),
         preceded(peek(tag("{")), is_not(" \t\r\n")),
     )))(remaining_meta)?;
     let (_, title_option) = opt(delimited(tag("\""), take_until("\""), tag("\"")))(remaining_meta)?;
-    Ok(("", (language_option, highlight_lines_option, title_option)))
+    Ok((
+        "",
+        (
+            language_option,
+            first_line_number_option,
+            highlight_lines_option,
+            title_option,
+        ),
+    ))
 }
 
 fn parse_fenced_code_block_last_line(line: &str) -> IResult<&str, &str> {
@@ -275,8 +290,10 @@ fn parse_jsx_component_last_line<'a>(
 }
 
 fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (_, (language_option, highlight_lines_option, title_option)) =
-        parse_fenced_code_block_first_line(line)?;
+    let (
+        _,
+        (language_option, first_line_number_option, highlight_line_numbers_option, title_option),
+    ) = parse_fenced_code_block_first_line(line)?;
 
     let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
     if let Some(value) = language_option {
@@ -284,7 +301,12 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str(value);
         markup.push('\"');
     };
-    if let Some(value) = highlight_lines_option {
+    if let Some(value) = first_line_number_option {
+        markup.push_str("\n  firstLine={");
+        markup.push_str(value);
+        markup.push('}');
+    };
+    if let Some(value) = highlight_line_numbers_option {
         markup.push_str("\n  highlightLines=\"");
         markup.push_str(value);
         markup.push('\"');
