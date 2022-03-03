@@ -48,6 +48,8 @@ enum LineType {
     CodeFragmentOpening,
     FencedCodeBlock,
     FencedCodeBlockOpen,
+    Frontmatter,
+    FrontmatterDelimiter,
     JSXComponent,
     Heading,
     Image,
@@ -594,6 +596,18 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
     result
 }
 
+fn parse_frontmatter_delimiter(line: &str) -> IResult<&str, &str> {
+    let (line, _) = tag("---")(line)?;
+    Ok((line, ""))
+}
+
+fn parse_frontmatter_line(line: &str) -> (Option<String>, LineType) {
+    match parse_frontmatter_delimiter(line) {
+        Ok((_frontmatter_line, _)) => (None, LineType::FrontmatterDelimiter),
+        Err(_) => (Some(String::from(line)), LineType::Frontmatter),
+    }
+}
+
 fn parse_mdx_line(
     line: &str,
     open_jsx_component_type: &Option<JSXComponentType>,
@@ -674,11 +688,38 @@ fn parse_mdx_line(
     }
 }
 
+pub fn parse_frontmatter(file: &File) -> usize {
+    let reader = BufReader::new(file);
+    let mut frontmatter_open = false;
+    let mut line_number = 1;
+
+    for line in reader.lines() {
+        let line_content = line.unwrap();
+        let (_frontmatter_line_option, line_type) = parse_frontmatter_line(&line_content);
+        if line_type == LineType::FrontmatterDelimiter {
+            frontmatter_open = !frontmatter_open;
+            if !frontmatter_open {
+                return line_number;
+            }
+        } else if !frontmatter_open {
+            /* first line of file (with content) is not frontmatter delimiter so assume there is no
+             * frontmatter
+             */
+            return 0;
+        };
+        line_number += 1;
+    }
+    line_number
+}
+
 pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     println!("[ INFO ] Trying to parse {:?}...", input_path);
     let start = Instant::now();
 
     let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
+    let frontmatter_end_line_number = parse_frontmatter(&file);
+    let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
+
     let slug = match input_path
         .file_stem()
         .expect("[ ERROR ] Couldn't open that file!")
@@ -696,14 +737,14 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     };
 
     let mut tokens: Vec<String> = Vec::new();
-    let reader = BufReader::new(file);
+    let reader = BufReader::new(&file);
 
     let mut current_indentation: usize = 0;
     let mut open_lists = ListStack::new();
     let mut open_jsx_component_type: Option<JSXComponentType> = None;
     let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
-    for line in reader.lines() {
+    for line in reader.lines().skip(frontmatter_end_line_number) {
         let line_content = line.unwrap();
         match parse_mdx_line(&line_content, &open_jsx_component_type) {
             Some((line, line_type, indentation)) => match line_type {
@@ -824,6 +865,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
         for token in &tokens {
             println!("{token}");
         }
+        println! {"\n"};
     }
 
     let mut outfile =
@@ -848,7 +890,6 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let duration = start.elapsed();
     let duration_milliseconds = duration.as_millis();
     let duration_microseconds = duration.as_micros() - (duration_milliseconds * 1000);
-    let input_file = File::open(&input_path).expect("[ ERROR ] Couldn't open that file!");
-    let file_size = input_file.metadata().unwrap().len() / 1000;
-    println!("\n[ INFO ] Parsing complete ({file_size} KB) in {duration_milliseconds}.{duration_microseconds:0>3} ms.");
+    let file_size = file.metadata().unwrap().len() / 1000;
+    println!("[ INFO ] Parsing complete ({file_size} KB) in {duration_milliseconds}.{duration_microseconds:0>3} ms.");
 }
