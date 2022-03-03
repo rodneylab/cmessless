@@ -193,7 +193,7 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
     let attributes_hash_map: HashMap<&str, &str> = attributes_vector.into_iter().collect();
     let href = attributes_hash_map
         .get("href")
-        .expect("[ ERROR ] Anchor tag missing href");
+        .unwrap_or_else(|| panic!("[ ERROR ] Anchor tag missing href: {line}"));
     let external_site = parse_href_scheme(href).is_ok();
     let mut additional_attributes = String::new();
 
@@ -485,11 +485,19 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 fn parse_opening_html_tag<'a>(line: &'a str, element_tag: &'a str) -> IResult<&'a str, &'a str> {
     let delimiter = &mut String::from("<");
     delimiter.push_str(element_tag);
-    delimited(
-        tag("<a"),
-        delimited(multispace0, take_until(">"), multispace0),
-        tag(">"),
-    )(line)
+    let x = alt((
+        delimited(
+            tag(delimiter.as_str()),
+            alt((delimited(multispace1, take_until(">"), multispace0),)),
+            tag(">"),
+        ),
+        delimited(
+            tag(delimiter.as_str()),
+            alt((delimited(multispace0, take_until(">"), multispace0),)),
+            tag(">"),
+        ),
+    ))(line);
+    x
 }
 
 fn parse_heading_text(line: &str) -> IResult<&str, usize> {

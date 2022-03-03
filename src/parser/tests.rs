@@ -361,6 +361,12 @@ pub fn test_parse_opening_html_tag() {
         parse_opening_html_tag(mdx_line, "a"),
         Ok(("site</a>.", ("href=\"https://www.example.com\"")))
     );
+
+    let mdx_line = "<a>site</a>.";
+    assert_eq!(
+        parse_opening_html_tag(mdx_line, "a"),
+        Ok(("site</a>.", ("")))
+    );
 }
 
 #[test]
