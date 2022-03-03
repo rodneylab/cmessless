@@ -73,7 +73,7 @@ pub fn test_form_fenced_code_block_first_line() {
         Ok((
             "",
             (
-                String::from("<CodeFragment\n  client:visible\n  language=\"plaintext\"\n  highlightLines=\"{5,7}\"\n  title=\".env\">\n  {`"),
+                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  highlightLines=\"{5,7}\"\n  title=\".env\">\n  {`\n  <!--"),
                 LineType::FencedCodeBlockOpen,
                 0
             )
