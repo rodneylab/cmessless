@@ -186,7 +186,9 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
     let (_, attributes_vector) = parse_html_tag_attributes(anchor_attributes_segment)?;
 
     let attributes_hash_map: HashMap<&str, &str> = attributes_vector.into_iter().collect();
-    let href = attributes_hash_map["href"];
+    let href = attributes_hash_map
+        .get("href")
+        .expect("[ ERROR ] Anchor tag missing href");
     let external_site = parse_href_scheme(href).is_ok();
     let mut additional_attributes = String::new();
 
@@ -719,11 +721,13 @@ pub fn slug_from_input_file_path(path: &Path) -> &str {
         .to_str()
     {
         Some(value) => match value {
-            "index" => &path
+            "index" => path
                 .parent()
                 .expect("[ ERROR ] Couldn't open that file!")
+                .file_name()
+                .expect("[ ERROR ] Couldn't open that file!")
                 .to_str()
-                .expect("[ ERROR ] Couldn't open that file!")[1..],
+                .expect("[ ERROR ] Couldn't open that file!"),
             other => other,
         },
         None => panic!("[ ERROR ] Couldn't open that file!"),

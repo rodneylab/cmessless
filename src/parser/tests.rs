@@ -104,6 +104,22 @@ pub fn test_form_html_anchor_element_line() {
 }
 
 #[test]
+#[should_panic(expected = "[ ERROR ] Anchor tag missing href")]
+pub fn test_form_html_anchor_element_line_panic() {
+    // Panics if href attribute is not present
+    let mdx_line = "<a to=\"https://www.example.com\">site</a>.";
+    assert_eq!(
+            form_html_anchor_element_line(mdx_line),
+            Ok((
+                "site</a>.",
+                String::from(
+                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">"
+                )
+            ))
+        );
+}
+
+#[test]
 pub fn test_form_code_span_line() {
     let mdx_line = "NewTech `console.log(\"made it here\")` first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
