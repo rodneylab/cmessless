@@ -316,7 +316,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str(value);
         markup.push('\"');
     };
-    markup.push_str(">\n  {`\n  <!--");
+    markup.push_str("\n  code={`");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
@@ -398,14 +398,7 @@ fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineT
 
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
-    Ok((
-        "",
-        (
-            String::from("  -->\n  `}\n</CodeFragment>"),
-            LineType::FencedCodeBlock,
-            0,
-        ),
-    ))
+    Ok(("", (String::from("`} />"), LineType::FencedCodeBlock, 0)))
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -581,7 +574,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
     result.push(String::from("---"));
     if components.contains(&JSXComponentType::CodeFragment) {
         result.push(String::from(
-            "import CodeFragment from '$components/CodeFragment.tsx';",
+            "import CodeFragment from '$components/CodeFragmentCore.tsx';",
         ));
     }
     if components.contains(&JSXComponentType::Image) {
