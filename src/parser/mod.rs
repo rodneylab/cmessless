@@ -597,6 +597,9 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         result.push(String::from(
             "import Questions from '$components/Questions.svelte'",
         ));
+        result.push(format!(
+            "import questions from '$content/blog/{slug}/questions.json';"
+        ));
     }
     if components.contains(&JSXComponentType::Tweet) {
         result.push(String::from(
