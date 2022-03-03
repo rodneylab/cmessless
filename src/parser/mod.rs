@@ -739,22 +739,6 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
 
     let slug = slug_from_input_file_path(input_path);
-    // let slug = match input_path
-    //     .file_stem()
-    //     .expect("[ ERROR ] Couldn't open that file!")
-    //     .to_str()
-    // {
-    //     Some(value) => match value {
-    //         "index" => &input_path
-    //             .parent()
-    //             .expect("[ ERROR ] Couldn't open that file!")
-    //             .to_str()
-    //             .expect("[ ERROR ] Couldn't open that file!")[1..],
-    //         other => other,
-    //     },
-    //     None => panic!("[ ERROR ] Couldn't open that file!"),
-    // };
-
     let mut tokens: Vec<String> = Vec::new();
     let reader = BufReader::new(&file);
 
