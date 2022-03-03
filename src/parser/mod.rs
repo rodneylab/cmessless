@@ -674,7 +674,7 @@ fn parse_mdx_line(
     }
 }
 
-pub fn parse_mdx_file(input_path: &Path, output_path: &Path) {
+pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     println!("[ INFO ] Trying to parse {:?}...", input_path);
     let start = Instant::now();
 
@@ -817,11 +817,13 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path) {
         };
     }
     let astro_frontmatter = form_astro_frontmatter(&present_jsx_component_types, slug);
-    for frontmatter_line in &astro_frontmatter {
-        println!("{frontmatter_line}");
-    }
-    for token in &tokens {
-        println!("{token}");
+    if verbose {
+        for frontmatter_line in &astro_frontmatter {
+            println!("{frontmatter_line}");
+        }
+        for token in &tokens {
+            println!("{token}");
+        }
     }
 
     let mut outfile =

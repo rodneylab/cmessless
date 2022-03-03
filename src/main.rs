@@ -69,17 +69,24 @@ impl Handler for CmslessHandler {
     }
 }
 
-fn parse_then_watch(mdx_path: &Path, output_path: &Path) -> Result<()> {
+fn parse_then_watch(mdx_path: &Path, output_path: &Path, verbose: bool) -> Result<()> {
+    let command = match verbose {
+        false => format!(
+            "cmessless {} --output {}",
+            mdx_path.to_string_lossy(),
+            output_path.to_string_lossy()
+        ),
+        true => format!(
+            "cmessless {} --verbose --output {}",
+            mdx_path.to_string_lossy(),
+            output_path.to_string_lossy()
+        ),
+    };
     let config = ConfigBuilder::default()
         .clear_screen(true)
         .run_initially(true)
         .paths(vec![mdx_path.into()])
-        .cmd(vec![
-            "./target/release/cmessless".into(),
-            mdx_path.to_str().unwrap().into(),
-            "--output".into(),
-            output_path.to_str().unwrap().into(),
-        ])
+        .cmd(vec![command])
         .build()
         .expect("[ ERROR ] Issue while configuring watchexec");
 
@@ -94,14 +101,14 @@ fn main() -> Result<()> {
 
     if cli.verbose {
         print_long_banner();
-        return Ok(());
+    } else {
+        print_short_banner();
     }
 
-    print_short_banner();
     if cli.watch {
-        return parse_then_watch(cli.path.as_path(), cli.output.as_path());
+        return parse_then_watch(cli.path.as_path(), cli.output.as_path(), cli.verbose);
     } else {
-        parse_mdx_file(cli.path.as_path(), cli.output.as_path());
+        parse_mdx_file(cli.path.as_path(), cli.output.as_path(), cli.verbose);
     }
     Ok(())
 }
