@@ -303,6 +303,12 @@ fn parse_fenced_code_block_script_line(line: &str) -> IResult<&str, &str> {
     Ok((after_tag, before_tag))
 }
 
+fn parse_fenced_code_block_script_open_line(line: &str) -> IResult<&str, &str> {
+    let delimiter = "<script ";
+    let (after_tag, (before_tag, _)) = pair(take_until(delimiter), tag(delimiter))(line)?;
+    Ok((after_tag, before_tag))
+}
+
 fn parse_fenced_code_block_last_line(line: &str) -> IResult<&str, &str> {
     tag("```")(line)
 }
@@ -460,7 +466,10 @@ fn form_fenced_code_block_import_line(line: &str) -> IResult<&str, (String, Line
 }
 
 fn form_fenced_code_block_script_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (after_tag, before_tag) = parse_fenced_code_block_script_line(line)?;
+    let (after_tag, before_tag) = alt((
+        parse_fenced_code_block_script_line,
+        parse_fenced_code_block_script_open_line,
+    ))(line)?;
     Ok((
         "",
         (
