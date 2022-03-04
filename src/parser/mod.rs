@@ -379,7 +379,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str(value);
         markup.push('\"');
     };
-    markup.push_str("\n  code={`");
+    markup.push_str("\n  code={`\n<!--");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
@@ -519,7 +519,10 @@ fn form_fenced_code_block_script_open_line(line: &str) -> IResult<&str, (String,
 
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
-    Ok(("", (String::from("`} />"), LineType::FencedCodeBlock, 0)))
+    Ok((
+        "",
+        (String::from("-->\n  `} />"), LineType::FencedCodeBlock, 0),
+    ))
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -703,7 +706,7 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
         ));
     }
     if components.contains(&JSXComponentType::Image) {
-        image_data_imports.push(String::from("image: imageProps"));
+        image_data_imports.push(String::from("images: imageProps"));
         result.push(String::from(
             "import Image from '$components/BlogPost/Image.svelte';",
         ));
