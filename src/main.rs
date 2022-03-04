@@ -168,7 +168,7 @@ fn parse_multiple_files(mdx_paths: &[PathBuf], relative_output_path: &Path, verb
             relative_output_path_from_input(input_path.as_path(), relative_output_path);
         parse_mdx_file(input_path.as_path(), output_path.as_path(), verbose);
     }
-    println!("\n[ INFO: {} files parsed.]", mdx_paths.len());
+    println!("\n[ INFO ] {} files parsed.", mdx_paths.len());
 }
 
 fn main() -> Result<()> {
@@ -189,7 +189,7 @@ fn main() -> Result<()> {
     } else if cli.path.len() > 1 {
         if !cli.relative {
             println!(
-            "\n[ ERROR: for multiple inputs, use the --relative flag to set a relative output path]"
+            "\n[ ERROR ] for multiple inputs, use the --relative flag to set a relative output path."
             );
         }
         parse_multiple_files(&cli.path, &cli.output, cli.verbose);
