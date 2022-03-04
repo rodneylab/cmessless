@@ -196,6 +196,9 @@ fn main() -> Result<()> {
     } else {
         get_piped_input()
     };
+    if inputs.is_empty() {
+        return Ok(());
+    }
 
     if cli.verbose {
         print_long_banner();
