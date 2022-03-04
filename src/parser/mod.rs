@@ -139,10 +139,52 @@ fn parse_up_to_opening_html_tag<'a>(
     result
 }
 
-fn segment_anchor_element_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+fn parse_opening_html_tag_no_attributes<'a>(
+    line: &'a str,
+    element_tag: &'a str,
+) -> IResult<&'a str, &'a str> {
+    // let delimiter = &mut String::from("<");
+    // delimiter.push_str(element_tag);
+    let closed_delimiter = &mut String::from("<");
+    closed_delimiter.push_str(element_tag);
+    closed_delimiter.push('>');
+    let (tag_close, _attributes) = tag(closed_delimiter.as_str())(line)?;
+    Ok((tag_close, ""))
+}
+
+fn parse_opening_html_tag_with_attributes<'a>(
+    line: &'a str,
+    element_tag: &'a str,
+) -> IResult<&'a str, &'a str> {
+    let delimiter = &mut String::from("<");
+    delimiter.push_str(element_tag);
+    // let closed_delimiter = &mut String::from("<");
+    // closed_delimiter.push_str(element_tag);
+    // closed_delimiter.push_str(">");
+    let (tag_close, attributes) = delimited(
+        tag(delimiter.as_str()),
+        delimited(multispace1, take_until(">"), multispace0),
+        tag(">"),
+    )(line)?;
+    Ok((tag_close, attributes))
+}
+
+fn segment_anchor_element_with_attributes_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
     let delimiter = "a";
     let (remainder, initial_segment) = parse_up_to_opening_html_tag(line, delimiter)?;
-    let (final_segment, anchor_attributes_segment) = parse_opening_html_tag(remainder, delimiter)?;
+    let (final_segment, anchor_attributes_segment) =
+        parse_opening_html_tag_with_attributes(remainder, delimiter)?;
+    Ok((
+        "",
+        (initial_segment, anchor_attributes_segment, final_segment),
+    ))
+}
+
+fn segment_anchor_element_no_attributes_line(line: &str) -> IResult<&str, (&str, &str, &str)> {
+    let delimiter = "a";
+    let (remainder, initial_segment) = parse_up_to_opening_html_tag(line, delimiter)?;
+    let (final_segment, anchor_attributes_segment) =
+        parse_opening_html_tag_no_attributes(remainder, delimiter)?;
     Ok((
         "",
         (initial_segment, anchor_attributes_segment, final_segment),
@@ -186,8 +228,10 @@ fn parse_href_scheme(href: &str) -> IResult<&str, &str> {
 }
 
 fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
-    let (_, (initial_segment, anchor_attributes_segment, final_segment)) =
-        segment_anchor_element_line(line)?;
+    let (_, (initial_segment, anchor_attributes_segment, final_segment)) = alt((
+        segment_anchor_element_with_attributes_line,
+        segment_anchor_element_no_attributes_line,
+    ))(line)?;
     let (_, attributes_vector) = parse_html_tag_attributes(anchor_attributes_segment)?;
 
     let attributes_hash_map: HashMap<&str, &str> = attributes_vector.into_iter().collect();
@@ -473,24 +517,6 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 
     let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
     Ok(("", format!("{initial_segment}{final_final_segment}")))
-}
-
-fn parse_opening_html_tag<'a>(line: &'a str, element_tag: &'a str) -> IResult<&'a str, &'a str> {
-    let delimiter = &mut String::from("<");
-    delimiter.push_str(element_tag);
-    let x = alt((
-        delimited(
-            tag(delimiter.as_str()),
-            alt((delimited(multispace1, take_until(">"), multispace0),)),
-            tag(">"),
-        ),
-        delimited(
-            tag(delimiter.as_str()),
-            alt((delimited(multispace0, take_until(">"), multispace0),)),
-            tag(">"),
-        ),
-    ))(line);
-    x
 }
 
 fn parse_heading_text(line: &str) -> IResult<&str, usize> {

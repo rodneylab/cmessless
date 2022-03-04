@@ -4,10 +4,10 @@ use crate::parser::{
     form_ordered_list_line, parse_fenced_code_block_first_line, parse_heading_text,
     parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
-    parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
-    parse_ordered_list_text, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, JSXTagType,
-    LineType,
+    parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag_no_attributes,
+    parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_unordered_list_text,
+    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
+    segment_strong_emphasis_line, JSXTagType, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -355,16 +355,19 @@ pub fn test_parse_inline_wrap_text() {
 }
 
 #[test]
-pub fn test_parse_opening_html_tag() {
+pub fn test_parse_opening_html_tag_with_attributes() {
     let mdx_line = "<a href=\"https://www.example.com\">site</a>.";
     assert_eq!(
-        parse_opening_html_tag(mdx_line, "a"),
+        parse_opening_html_tag_with_attributes(mdx_line, "a"),
         Ok(("site</a>.", ("href=\"https://www.example.com\"")))
     );
+}
 
+#[test]
+pub fn test_parse_opening_html_tag_no_attributes() {
     let mdx_line = "<a>site</a>.";
     assert_eq!(
-        parse_opening_html_tag(mdx_line, "a"),
+        parse_opening_html_tag_no_attributes(mdx_line, "a"),
         Ok(("site</a>.", ("")))
     );
 }
