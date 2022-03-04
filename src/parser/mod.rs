@@ -494,14 +494,23 @@ fn form_fenced_code_block_import_line(line: &str) -> IResult<&str, (String, Line
 }
 
 fn form_fenced_code_block_script_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (after_tag, before_tag) = alt((
-        parse_fenced_code_block_script_line,
-        parse_fenced_code_block_script_open_line,
-    ))(line)?;
+    let (after_tag, before_tag) = parse_fenced_code_block_script_line(line)?;
     Ok((
         "",
         (
             format!("{before_tag}<script-astro>{after_tag}"),
+            LineType::FencedCodeBlockOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_fenced_code_block_script_open_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (after_tag, before_tag) = parse_fenced_code_block_script_open_line(line)?;
+    Ok((
+        "",
+        (
+            format!("{before_tag}<script-astro {after_tag}"),
             LineType::FencedCodeBlockOpen,
             0,
         ),
@@ -798,6 +807,7 @@ fn parse_mdx_line(
             form_fenced_code_block_last_line,
             form_fenced_code_block_import_line,
             form_fenced_code_block_script_line,
+            form_fenced_code_block_script_open_line,
         ))(line)
         {
             Ok((_, (line, line_type, level))) => {
