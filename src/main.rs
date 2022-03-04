@@ -1,7 +1,10 @@
 mod parser;
 
 use clap::Parser;
-use std::path::Path;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use watchexec::{
     config::{Config, ConfigBuilder},
     error::Result,
@@ -14,17 +17,26 @@ use parser::{author_name_from_cargo_pkg_authors, parse_mdx_file};
 #[derive(Parser)]
 #[clap(author,version,about,long_about=None)]
 struct Cli {
-    path: std::path::PathBuf,
+    path: Vec<PathBuf>,
 
-    #[clap(parse(from_os_str))]
-    #[clap(short = 'o', long = "output")]
-    output: std::path::PathBuf,
+    #[clap(short, long)]
+    check: bool,
+
+    #[clap(short, long)]
+    modified: bool,
+
+    #[clap(short = 'R', long)]
+    relative: bool, // path should only contain UTF-8 characters
 
     #[clap(short, long)]
     verbose: bool,
 
     #[clap(short, long)]
     watch: bool,
+
+    #[clap(parse(from_os_str))]
+    #[clap(short, long)]
+    output: std::path::PathBuf,
 }
 
 fn get_title() -> String {
@@ -69,24 +81,24 @@ impl Handler for CmslessHandler {
     }
 }
 
-fn parse_then_watch(mdx_path: &Path, output_path: &Path, verbose: bool) -> Result<()> {
+fn parse_then_watch(mdx_paths: &[PathBuf], output_path: &Path, verbose: bool) -> Result<()> {
     let command = if verbose {
         format!(
             "cmessless {} --verbose --output {}",
-            mdx_path.to_string_lossy(),
+            mdx_paths[0].to_string_lossy(),
             output_path.to_string_lossy()
         )
     } else {
         format!(
             "cmessless {} --output {}",
-            mdx_path.to_string_lossy(),
+            mdx_paths[0].to_string_lossy(),
             output_path.to_string_lossy()
         )
     };
     let config = ConfigBuilder::default()
         .clear_screen(true)
         .run_initially(true)
-        .paths(vec![mdx_path.into()])
+        .paths(vec![mdx_paths[0].as_path().into()])
         .cmd(vec![command])
         .build()
         .expect("[ ERROR ] Issue while configuring watchexec");
@@ -97,8 +109,74 @@ fn parse_then_watch(mdx_path: &Path, output_path: &Path, verbose: bool) -> Resul
     watch(&handler)
 }
 
+fn relative_output_path_from_input(input_path: &Path, relative_output_path: &Path) -> PathBuf {
+    match input_path.to_string_lossy().find("/./") {
+        Some(_) => {}
+        None => panic!(
+            "[ ERROR ] Using relative mode: check input paths include a \"/./\" marker to separate \
+        root and relative parts."
+        ),
+    }
+
+    let mut components = input_path.components();
+    loop {
+        if components.as_path().to_string_lossy().find("/./") == None {
+            break;
+        }
+        components.next();
+    }
+
+    let mut result = PathBuf::new();
+    result.push(relative_output_path);
+    let tail = components.as_path();
+    let mut output_file_name = String::from(tail.file_stem().unwrap().to_string_lossy());
+    output_file_name.push_str(".astro");
+    relative_output_path
+        .join(tail.parent().unwrap())
+        .join(PathBuf::from(output_file_name))
+}
+
+fn check_modified_files(mdx_paths: &[PathBuf], relative_output_path: &Path) {
+    let mut modified_files: Vec<String> = Vec::new();
+    for input_path in mdx_paths {
+        let output_path =
+            relative_output_path_from_input(input_path.as_path(), relative_output_path);
+        let input_modified = match fs::metadata(input_path).unwrap().modified() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        };
+        let output_modified = match fs::metadata(output_path) {
+            Ok(metadata_value) => match metadata_value.modified() {
+                Ok(value) => Some(value),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        };
+        if output_modified == None
+            || input_modified == None
+            || input_modified.unwrap() > output_modified.unwrap()
+        {
+            modified_files.push(String::from(input_path.to_string_lossy()));
+        }
+    }
+    println!("{}", modified_files.join(" "));
+}
+
+fn parse_multiple_files(mdx_paths: &[PathBuf], relative_output_path: &Path, verbose: bool) {
+    for input_path in mdx_paths {
+        let output_path =
+            relative_output_path_from_input(input_path.as_path(), relative_output_path);
+        parse_mdx_file(input_path.as_path(), output_path.as_path(), verbose);
+    }
+    println!("\n[ INFO: {} files parsed.]", mdx_paths.len());
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    if cli.check {
+        check_modified_files(&cli.path, &cli.output);
+        return Ok(());
+    }
 
     if cli.verbose {
         print_long_banner();
@@ -107,9 +185,46 @@ fn main() -> Result<()> {
     }
 
     if cli.watch {
-        return parse_then_watch(cli.path.as_path(), cli.output.as_path(), cli.verbose);
+        return parse_then_watch(&cli.path, cli.output.as_path(), cli.verbose);
+    } else if cli.path.len() > 1 {
+        if !cli.relative {
+            println!(
+            "\n[ ERROR: for multiple inputs, use the --relative flag to set a relative output path]"
+            );
+        }
+        parse_multiple_files(&cli.path, &cli.output, cli.verbose);
     } else {
-        parse_mdx_file(cli.path.as_path(), cli.output.as_path(), cli.verbose);
+        parse_mdx_file(cli.path[0].as_path(), cli.output.as_path(), cli.verbose);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::relative_output_path_from_input;
+    use std::path::PathBuf;
+
+    #[test]
+    pub fn test_relative_output_path_from_input() {
+        let input_path = PathBuf::from("local/files/input/./day-one/morning.txt");
+        let relative_output_path = PathBuf::from("local/files/output");
+        assert_eq!(
+            relative_output_path_from_input(input_path.as_path(), relative_output_path.as_path()),
+            PathBuf::from("local/files/output/day-one/morning.astro")
+        );
+    }
+
+    #[should_panic(
+        expected = "[ ERROR ] Using relative mode: check input paths include a \"/./\" \
+        marker to separate root and relative parts."
+    )]
+    #[test]
+    pub fn test_relative_output_path_from_input_panic() {
+        let input_path = PathBuf::from("local/files/input/day-one/morning.mdx");
+        let relative_output_path = PathBuf::from("local/files/output");
+        assert_eq!(
+            relative_output_path_from_input(input_path.as_path(), relative_output_path.as_path()),
+            PathBuf::from("local/files/output/day-one/morning.astro")
+        );
+    }
 }
