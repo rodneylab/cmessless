@@ -1,4 +1,5 @@
 mod parser;
+mod utility;
 
 use atty::{is, Stream};
 use clap::Parser;

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests;
+use crate::utility::stack::Stack;
 
 use nom::{
     branch::alt,
@@ -30,6 +31,8 @@ enum JSXComponentType {
     CodeFragment,
     CodeFragmentOpening,
     FencedCodeBlock,
+    HowTo,
+    HowToOpening,
     Image,
     Poll,
     PollOpening,
@@ -57,6 +60,9 @@ enum LineType {
     FrontmatterDelimiter,
     JSXComponent,
     Heading,
+    HowTo,
+    HowToOpen,
+    HowToOpening,
     Image,
     OrderedListItem,
     Paragraph,
@@ -388,6 +394,17 @@ fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String,
     }
 }
 
+fn form_how_to_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "HowTo";
+    let (_, (_parsed_value, jsx_tag_type)) =
+        parse_jsx_component_first_line(line, component_identifier)?;
+    match jsx_tag_type {
+        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::HowToOpen, 0))),
+        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::HowToOpening, 0))),
+        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::HowTo, 0))),
+    }
+}
+
 fn form_image_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Image";
     let (_, attributes) = parse_jsx_component(line, component_identifier)?;
@@ -429,6 +446,17 @@ fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineTyp
         JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpening, 0))),
         JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Video, 0))),
     }
+}
+
+fn form_how_to_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, line_type) = alt((
+        map(terminated(take_until("/>"), tag("/>")), |_| LineType::HowTo),
+        map(terminated(take_until(">"), tag(">")), |_| {
+            LineType::HowToOpen
+        }),
+        map(rest, |_| LineType::HowToOpening),
+    ))(line)?;
+    Ok(("", (line.to_string(), line_type, 0)))
 }
 
 fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -494,6 +522,20 @@ fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, 
         (
             format!("{initial_segment}{final_segment}"),
             LineType::CodeFragment,
+            0,
+        ),
+    ))
+}
+
+fn form_how_to_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "HowTo";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_last_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::HowTo,
             0,
         ),
     ))
@@ -643,6 +685,14 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
             "import CodeFragment from '$components/CodeFragmentCore.tsx';",
         ));
     }
+    if components.contains(&JSXComponentType::HowTo) {
+        result.push(String::from(
+            "import HowTo from '$components/HowTo/index.svelte';
+import HowToSection from '$components/HowTo/HowToSection.svelte';
+import HowToStep from '$components/HowTo/HowToStep.svelte';
+import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
+        ));
+    }
     if components.contains(&JSXComponentType::Image) {
         image_data_imports.push(String::from("image: imageProps"));
         result.push(String::from(
@@ -711,9 +761,19 @@ fn parse_frontmatter_line(line: &str) -> (Option<String>, LineType) {
 
 fn parse_mdx_line(
     line: &str,
-    open_jsx_component_type: &Option<JSXComponentType>,
+    open_jsx_component_type: Option<&JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
     match open_jsx_component_type {
+        Some(JSXComponentType::HowToOpening) => match form_how_to_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+        },
         Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
             Ok((_, (line, line_type, level))) => {
                 if !line.is_empty() {
@@ -749,6 +809,20 @@ fn parse_mdx_line(
             }
             Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
         },
+        Some(JSXComponentType::HowTo) => match alt((
+            form_how_to_component_last_line,
+            form_fenced_code_block_first_line,
+        ))(line)
+        {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
+        },
         Some(_) => {
             match alt((
                 form_code_fragment_component_last_line,
@@ -770,6 +844,7 @@ fn parse_mdx_line(
             match alt((
                 form_code_fragment_component_first_line,
                 form_fenced_code_block_first_line,
+                form_how_to_component_first_line,
                 form_image_component,
                 form_poll_component_first_line,
                 form_questions_component,
@@ -852,12 +927,13 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
 
     let mut current_indentation: usize = 0;
     let mut open_lists = ListStack::new();
-    let mut open_jsx_component_type: Option<JSXComponentType> = None;
+    // let mut open_jsx_component_type: Option<JSXComponentType> = None;
+    let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
     let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
     for line in reader.lines().skip(frontmatter_end_line_number) {
         let line_content = line.unwrap();
-        match parse_mdx_line(&line_content, &open_jsx_component_type) {
+        match parse_mdx_line(&line_content, open_jsx_component_type.peek()) {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::OrderedListItem => {
                     if open_lists.is_empty() {
@@ -899,19 +975,27 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 }
                 LineType::Poll => {
                     present_jsx_component_types.insert(JSXComponentType::Poll);
-
-                    open_jsx_component_type = None;
+                    open_jsx_component_type.pop();
                     tokens.push(line);
                 }
                 LineType::Video => {
                     present_jsx_component_types.insert(JSXComponentType::Video);
-
-                    open_jsx_component_type = None;
+                    open_jsx_component_type.pop();
                     tokens.push(line);
                 }
-                LineType::FencedCodeBlock | LineType::CodeFragment => {
+                LineType::FencedCodeBlock => {
                     present_jsx_component_types.insert(JSXComponentType::CodeFragment);
-                    open_jsx_component_type = None;
+                    open_jsx_component_type.pop();
+                    tokens.push(line);
+                }
+                LineType::CodeFragment => {
+                    present_jsx_component_types.insert(JSXComponentType::CodeFragment);
+                    open_jsx_component_type.pop();
+                    tokens.push(line);
+                }
+                LineType::HowTo => {
+                    present_jsx_component_types.insert(JSXComponentType::HowTo);
+                    open_jsx_component_type.pop();
                     tokens.push(line);
                 }
                 LineType::Image => {
@@ -927,32 +1011,60 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     tokens.push(line);
                 }
                 LineType::FencedCodeBlockOpen => {
-                    open_jsx_component_type = Some(JSXComponentType::FencedCodeBlock);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::FencedCodeBlock) {
+                        open_jsx_component_type.push(JSXComponentType::FencedCodeBlock);
+                    }
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpen => {
-                    open_jsx_component_type = Some(JSXComponentType::CodeFragment);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::CodeFragment) {
+                        open_jsx_component_type.push(JSXComponentType::CodeFragment);
+                    }
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpening => {
-                    open_jsx_component_type = Some(JSXComponentType::CodeFragmentOpening);
+                    if open_jsx_component_type.peek()
+                        != Some(&JSXComponentType::CodeFragmentOpening)
+                    {
+                        open_jsx_component_type.push(JSXComponentType::CodeFragmentOpening);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HowToOpen => {
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::HowTo) {
+                        open_jsx_component_type.push(JSXComponentType::HowTo);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HowToOpening => {
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::HowToOpening) {
+                        open_jsx_component_type.push(JSXComponentType::HowToOpening);
+                    }
                     tokens.push(line);
                 }
                 LineType::PollOpen => {
                     present_jsx_component_types.insert(JSXComponentType::Poll);
-                    open_jsx_component_type = Some(JSXComponentType::Poll);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::Poll) {
+                        open_jsx_component_type.push(JSXComponentType::Poll);
+                    }
                     tokens.push(line);
                 }
                 LineType::PollOpening => {
-                    open_jsx_component_type = Some(JSXComponentType::PollOpening);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::PollOpening) {
+                        open_jsx_component_type.push(JSXComponentType::PollOpening);
+                    }
                     tokens.push(line);
                 }
                 LineType::VideoOpen => {
-                    open_jsx_component_type = Some(JSXComponentType::Video);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::Video) {
+                        open_jsx_component_type.push(JSXComponentType::Video);
+                    }
                     tokens.push(line);
                 }
                 LineType::VideoOpening => {
-                    open_jsx_component_type = Some(JSXComponentType::VideoOpening);
+                    if open_jsx_component_type.peek() != Some(&JSXComponentType::VideoOpening) {
+                        open_jsx_component_type.push(JSXComponentType::VideoOpening);
+                    }
                     tokens.push(line);
                 }
                 _ => tokens.push(line),

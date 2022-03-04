@@ -340,7 +340,7 @@ pub fn test_parse_jsx_component_first_line() {
 pub fn test_parse_mdx_line() {
     let mdx_line = "# Getting Started with NewTech  ";
     assert_eq!(
-        parse_mdx_line(mdx_line, &None),
+        parse_mdx_line(mdx_line, None),
         Some((
             String::from("<h1>Getting Started with NewTech  </h1>"),
             LineType::Heading,
@@ -350,7 +350,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "### What Does All This Mean?";
     assert_eq!(
-        parse_mdx_line(mdx_line, &None),
+        parse_mdx_line(mdx_line, None),
         Some((
             String::from("<h3>What Does All This Mean?</h3>"),
             LineType::Heading,
@@ -360,7 +360,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
-            parse_mdx_line(mdx_line, &None),
+            parse_mdx_line(mdx_line, None),
             Some((String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"),
                 LineType::Paragraph, 0))
         );
