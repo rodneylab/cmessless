@@ -1,7 +1,8 @@
 use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
-    form_fenced_code_block_first_line, form_html_anchor_element_line, form_inline_wrap_text,
-    form_ordered_list_line, parse_fenced_code_block_first_line, parse_heading_text,
+    form_fenced_code_block_first_line, form_fenced_code_block_script_line,
+    form_html_anchor_element_line, form_inline_wrap_text, form_ordered_list_line,
+    parse_fenced_code_block_first_line, parse_fenced_code_block_script_line, parse_heading_text,
     parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag_no_attributes,
@@ -87,6 +88,22 @@ pub fn test_form_fenced_code_block_first_line() {
             "",
             (
                 String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines=\"{5,7}\"\n  title=\".env\"\n  code={`"),
+                LineType::FencedCodeBlockOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_fenced_code_block_script_line() {
+    let mdx_line = "  <script>";
+    assert_eq!(
+        form_fenced_code_block_script_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("  <script-astro>"),
                 LineType::FencedCodeBlockOpen,
                 0
             )
@@ -212,6 +229,15 @@ pub fn test_parse_fenced_code_block_first_line() {
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
         Ok(("", (Some("plaintext"), Some("2"), Some("{5,7}"), None)))
+    );
+}
+
+#[test]
+pub fn test_parse_fenced_code_block_script_line() {
+    let mdx_line = "  <script>";
+    assert_eq!(
+        parse_fenced_code_block_script_line(mdx_line),
+        Ok(("", "  "))
     );
 }
 
