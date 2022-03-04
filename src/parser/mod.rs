@@ -143,8 +143,6 @@ fn parse_opening_html_tag_no_attributes<'a>(
     line: &'a str,
     element_tag: &'a str,
 ) -> IResult<&'a str, &'a str> {
-    // let delimiter = &mut String::from("<");
-    // delimiter.push_str(element_tag);
     let closed_delimiter = &mut String::from("<");
     closed_delimiter.push_str(element_tag);
     closed_delimiter.push('>');
@@ -158,9 +156,6 @@ fn parse_opening_html_tag_with_attributes<'a>(
 ) -> IResult<&'a str, &'a str> {
     let delimiter = &mut String::from("<");
     delimiter.push_str(element_tag);
-    // let closed_delimiter = &mut String::from("<");
-    // closed_delimiter.push_str(element_tag);
-    // closed_delimiter.push_str(">");
     let (tag_close, attributes) = delimited(
         tag(delimiter.as_str()),
         delimited(multispace1, take_until(">"), multispace0),
