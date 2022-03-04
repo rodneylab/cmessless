@@ -214,11 +214,11 @@ mod tests {
         );
     }
 
+    #[test]
     #[should_panic(
         expected = "[ ERROR ] Using relative mode: check input paths include a \"/./\" \
         marker to separate root and relative parts."
     )]
-    #[test]
     pub fn test_relative_output_path_from_input_panic() {
         let input_path = PathBuf::from("local/files/input/day-one/morning.mdx");
         let relative_output_path = PathBuf::from("local/files/output");
