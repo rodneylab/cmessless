@@ -291,6 +291,12 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
     ))
 }
 
+fn parse_fenced_code_block_import_line(line: &str) -> IResult<&str, (&str, &str)> {
+    let delimiter = "import";
+    let (after_tag, (before_tag, tag)) = pair(multispace0, tag(delimiter))(line)?;
+    Ok((after_tag, (before_tag, tag)))
+}
+
 fn parse_fenced_code_block_script_line(line: &str) -> IResult<&str, &str> {
     let delimiter = "<script>";
     let (after_tag, (before_tag, _)) = pair(take_until(delimiter), tag(delimiter))(line)?;
@@ -439,6 +445,18 @@ fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineT
         map(rest, |_| LineType::VideoOpening),
     ))(line)?;
     Ok(("", (line.to_string(), line_type, 0)))
+}
+
+fn form_fenced_code_block_import_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (after_tag, (before_tag, tag)) = parse_fenced_code_block_import_line(line)?;
+    Ok((
+        "",
+        (
+            format!("{before_tag}//astro-ignore {tag}{after_tag}"),
+            LineType::FencedCodeBlockOpen,
+            0,
+        ),
+    ))
 }
 
 fn form_fenced_code_block_script_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -707,18 +725,9 @@ fn parse_mdx_line(
             }
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
         },
-        // Some(JSXComponentType::FencedCodeBlock) => match form_fenced_code_block_last_line(line) {
-        //     Ok((_, (line, line_type, level))) => {
-        //         if !line.is_empty() {
-        //             Some((line, line_type, level))
-        //         } else {
-        //             None
-        //         }
-        //     }
-        //     Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
-        // },
         Some(JSXComponentType::FencedCodeBlock) => match alt((
             form_fenced_code_block_last_line,
+            form_fenced_code_block_import_line,
             form_fenced_code_block_script_line,
         ))(line)
         {
