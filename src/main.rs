@@ -84,12 +84,6 @@ impl Handler for CmslessHandler {
 }
 
 fn parse_then_watch(mdx_paths: &[PathBuf], output_path: &Path, verbose: bool) -> Result<()> {
-    let mut paths_str = String::new();
-    for path in mdx_paths.iter() {
-        paths_str.push_str(&path.to_string_lossy());
-        paths_str.push(' ');
-    }
-
     let output_path_str = output_path.to_string_lossy();
     let mut command: Vec<String> = vec!["cmessless".into()];
     command.extend(mdx_paths.iter().map(|value| value.to_string_lossy().into()));
