@@ -102,16 +102,6 @@ fn parse_then_watch(mdx_paths: &[PathBuf], output_path: &Path, verbose: bool) ->
     command.push(" --output".into());
     command.push(output_path_str.into());
 
-    // let command = if verbose {
-    //     format!(
-    //         "cmessless {paths_str} --check --output {output_path_str} | cmessless --relative --verbose --output {output_path_str}"
-    //     )
-    // } else {
-    //     format!(
-    //         "cmessless {paths_str} --check --output {output_path_str} | cmessless --relative --output {output_path_str}"
-    //     )
-    // };
-
     let config = ConfigBuilder::default()
         .clear_screen(true)
         .run_initially(true)
