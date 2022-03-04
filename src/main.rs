@@ -1,8 +1,10 @@
 mod parser;
 
+use atty::{is, Stream};
 use clap::Parser;
 use std::{
     fs,
+    io::{self, BufRead},
     path::{Path, PathBuf},
 };
 use watchexec::{
@@ -82,24 +84,39 @@ impl Handler for CmslessHandler {
 }
 
 fn parse_then_watch(mdx_paths: &[PathBuf], output_path: &Path, verbose: bool) -> Result<()> {
-    let command = if verbose {
-        format!(
-            "cmessless {} --verbose --output {}",
-            mdx_paths[0].to_string_lossy(),
-            output_path.to_string_lossy()
-        )
-    } else {
-        format!(
-            "cmessless {} --output {}",
-            mdx_paths[0].to_string_lossy(),
-            output_path.to_string_lossy()
-        )
-    };
+    let mut paths_str = String::new();
+    for path in mdx_paths.iter() {
+        paths_str.push_str(&path.to_string_lossy());
+        paths_str.push(' ');
+    }
+
+    let output_path_str = output_path.to_string_lossy();
+    let mut command: Vec<String> = vec!["cmessless".into()];
+    command.extend(mdx_paths.iter().map(|value| value.to_string_lossy().into()));
+    command.push("--check --output".into());
+    command.push(output_path.to_string_lossy().into());
+    command.push("| cmessless --relative".into());
+    if verbose {
+        command.push("--verbose".into());
+    }
+    command.push(" --output".into());
+    command.push(output_path_str.into());
+
+    // let command = if verbose {
+    //     format!(
+    //         "cmessless {paths_str} --check --output {output_path_str} | cmessless --relative --verbose --output {output_path_str}"
+    //     )
+    // } else {
+    //     format!(
+    //         "cmessless {paths_str} --check --output {output_path_str} | cmessless --relative --output {output_path_str}"
+    //     )
+    // };
+
     let config = ConfigBuilder::default()
         .clear_screen(true)
         .run_initially(true)
-        .paths(vec![mdx_paths[0].as_path().into()])
-        .cmd(vec![command])
+        .paths(mdx_paths)
+        .cmd(command)
         .build()
         .expect("[ ERROR ] Issue while configuring watchexec");
 
@@ -171,12 +188,30 @@ fn parse_multiple_files(mdx_paths: &[PathBuf], relative_output_path: &Path, verb
     println!("\n[ INFO ] {} files parsed.", mdx_paths.len());
 }
 
+fn get_piped_input() -> Vec<PathBuf> {
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    let mut handle = stdin.lock();
+    handle.read_line(&mut buffer).unwrap_or(0);
+    let result = buffer[..buffer.len() - 1]
+        .split(' ')
+        .map(PathBuf::from)
+        .collect();
+    result
+}
+
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = &Cli::parse();
     if cli.check {
         check_modified_files(&cli.path, &cli.output);
         return Ok(());
     }
+
+    let inputs = if is(Stream::Stdin) {
+        cli.path.to_vec()
+    } else {
+        get_piped_input()
+    };
 
     if cli.verbose {
         print_long_banner();
@@ -185,16 +220,19 @@ fn main() -> Result<()> {
     }
 
     if cli.watch {
-        return parse_then_watch(&cli.path, cli.output.as_path(), cli.verbose);
+        return parse_then_watch(&inputs, cli.output.as_path(), cli.verbose);
     } else if cli.path.len() > 1 {
         if !cli.relative {
             println!(
             "\n[ ERROR ] for multiple inputs, use the --relative flag to set a relative output path."
             );
         }
-        parse_multiple_files(&cli.path, &cli.output, cli.verbose);
+        parse_multiple_files(&inputs, &cli.output, cli.verbose);
+    } else if cli.relative {
+        let output_path = relative_output_path_from_input(inputs[0].as_path(), &cli.output);
+        parse_mdx_file(inputs[0].as_path(), &output_path, cli.verbose);
     } else {
-        parse_mdx_file(cli.path[0].as_path(), cli.output.as_path(), cli.verbose);
+        parse_mdx_file(inputs[0].as_path(), cli.output.as_path(), cli.verbose);
     }
     Ok(())
 }
