@@ -698,6 +698,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         ));
     }
     if components.contains(&JSXComponentType::HowTo) {
+        define_slug = true;
         result.push(String::from(
             "import HowTo from '$components/HowTo/index.svelte';
 import HowToSection from '$components/HowTo/HowToSection.svelte';
@@ -706,7 +707,8 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
         ));
     }
     if components.contains(&JSXComponentType::Image) {
-        image_data_imports.push(String::from("images: imageProps"));
+        define_slug = true;
+        image_data_imports.push(String::from("images"));
         result.push(String::from(
             "import Image from '$components/BlogPost/Image.svelte';",
         ));
@@ -754,6 +756,11 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
     }
     if define_slug {
         result.push(format!("\nconst slug = '{slug}';"));
+    }
+    if components.contains(&JSXComponentType::Image) {
+        result.push(String::from(
+            "const imageProps = images.map((element, index) => ({ index, ...element, slug }));",
+        ));
     }
     result.push(String::from("---\n"));
     result
