@@ -2,14 +2,15 @@ use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
     form_fenced_code_block_first_line, form_fenced_code_block_import_line,
     form_fenced_code_block_script_line, form_html_anchor_element_line, form_inline_wrap_text,
-    form_ordered_list_line, parse_fenced_code_block_first_line,
+    form_ordered_list_line, parse_closing_html_tag, parse_fenced_code_block_first_line,
     parse_fenced_code_block_import_line, parse_fenced_code_block_script_line, parse_heading_text,
-    parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes,
+    parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
-    parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag_no_attributes,
-    parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_unordered_list_text,
+    parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
+    parse_opening_html_tag_no_attributes, parse_opening_html_tag_with_attributes,
+    parse_ordered_list_text, parse_self_closing_html_tag, parse_unordered_list_text,
     parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
-    segment_strong_emphasis_line, JSXTagType, LineType,
+    segment_strong_emphasis_line, HTMLTagType, JSXTagType, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -307,6 +308,15 @@ pub fn test_parse_html_tag_attributes() {
 }
 
 #[test]
+pub fn test_parse_html_tag_content() {
+    let tag_content = "main class=\"container\" />";
+    assert_eq!(
+        parse_html_tag_content(tag_content),
+        Ok(("/>", ("main", "class=\"container\" ")))
+    );
+}
+
+#[test]
 pub fn test_parse_jsx_component() {
     let mdx_line = "<Questions {questions} />";
     assert_eq!(
@@ -340,7 +350,7 @@ pub fn test_parse_jsx_component_first_line() {
 pub fn test_parse_mdx_line() {
     let mdx_line = "# Getting Started with NewTech  ";
     assert_eq!(
-        parse_mdx_line(mdx_line, None),
+        parse_mdx_line(mdx_line, None, None),
         Some((
             String::from("<h1>Getting Started with NewTech  </h1>"),
             LineType::Heading,
@@ -350,7 +360,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "### What Does All This Mean?";
     assert_eq!(
-        parse_mdx_line(mdx_line, None),
+        parse_mdx_line(mdx_line, None, None),
         Some((
             String::from("<h3>What Does All This Mean?</h3>"),
             LineType::Heading,
@@ -360,7 +370,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
-            parse_mdx_line(mdx_line, None),
+            parse_mdx_line(mdx_line, None,None),
             Some((String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"),
                 LineType::Paragraph, 0))
         );
@@ -436,6 +446,36 @@ pub fn test_parse_ordered_list_text() {
     assert_eq!(
         parse_ordered_list_text(list_line_mdx),
         Ok(("first of all  ", 2))
+    );
+}
+
+#[test]
+pub fn test_parse_closing_html_tag() {
+    let tag = "</main> ";
+    assert_eq!(
+        parse_closing_html_tag(tag),
+        Ok((" ", ("main", "", HTMLTagType::Closing)))
+    );
+}
+
+#[test]
+pub fn test_parse_self_closing_html_tag() {
+    let tag = "<main class=\"container\" /> ";
+    assert_eq!(
+        parse_self_closing_html_tag(tag),
+        Ok((
+            " ",
+            ("main", "class=\"container\" ", HTMLTagType::SelfClosing)
+        ))
+    );
+}
+
+#[test]
+pub fn test_parse_opening_html_tag() {
+    let tag = "<main class=\"container\" > ";
+    assert_eq!(
+        parse_opening_html_tag(tag),
+        Ok((" ", ("main", "class=\"container\" ", HTMLTagType::Opening)))
     );
 }
 

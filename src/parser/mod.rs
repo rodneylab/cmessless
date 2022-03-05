@@ -5,7 +5,7 @@ use crate::utility::stack::Stack;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
-    character::complete::{alpha1, digit1, multispace0, multispace1},
+    character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1},
     combinator::{map, opt, peek, rest, value},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -27,6 +27,11 @@ type ParsedFencedCodeBlockMeta<'a> = (
 );
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+enum HTMLBlockElementType {
+    Figure,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 enum JSXComponentType {
     CodeFragment,
     CodeFragmentOpening,
@@ -40,6 +45,13 @@ enum JSXComponentType {
     Tweet,
     Video,
     VideoOpening,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HTMLTagType {
+    Opening,
+    // SelfClosing,
+    Closing,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -60,6 +72,8 @@ enum LineType {
     FrontmatterDelimiter,
     JSXComponent,
     Heading,
+    HTMLFigureBlockOpen,
+    HTMLFigureBlock,
     HowTo,
     HowToOpen,
     HowToOpening,
@@ -134,6 +148,39 @@ fn parse_up_to_inline_wrap_segment<'a>(
 ) -> IResult<&'a str, (&'a str, &'a str)> {
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
+
+fn parse_html_tag_content(line: &str) -> IResult<&str, (&str, &str)> {
+    let (remainder, tag_content) = is_not(">/")(line)?;
+    let (attributes, (tag_name, _space)) = pair(alphanumeric1, multispace0)(tag_content)?;
+    Ok((remainder, (tag_name, attributes)))
+}
+
+fn parse_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
+    let (remaining_line, (tag_name, tag_attributes)) =
+        delimited(tag("</"), parse_html_tag_content, tag(">"))(line)?;
+    Ok((
+        remaining_line,
+        (tag_name, tag_attributes, HTMLTagType::Closing),
+    ))
+}
+
+fn parse_opening_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
+    let (remaining_line, (tag_name, tag_attributes)) =
+        delimited(tag("<"), parse_html_tag_content, tag(">"))(line)?;
+    Ok((
+        remaining_line,
+        (tag_name, tag_attributes, HTMLTagType::Opening),
+    ))
+}
+
+// fn parse_self_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
+//     let (remaining_line, (tag_name, tag_attributes)) =
+//         delimited(tag("<"), parse_html_tag_content, tag("/>"))(line)?;
+//     Ok((
+//         remaining_line,
+//         (tag_name, tag_attributes, HTMLTagType::SelfClosing),
+//     ))
+// }
 
 fn parse_up_to_opening_html_tag<'a>(
     line: &'a str,
@@ -350,6 +397,22 @@ fn parse_jsx_component_last_line<'a>(
     delimiter.push_str(component_identifier);
     let result = tag(delimiter.as_str())(line);
     result
+}
+
+fn form_html_block_element_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_remaining_line, (tag_name, _tag_attributes, _tag_type)) = parse_opening_html_tag(line)?;
+    match tag_name {
+        "figure" => Ok(("", (String::from(line), LineType::HTMLFigureBlockOpen, 0))),
+        _ => panic!("[ ERROR ] Unrecognised HTML block element: {tag_name}"),
+    }
+}
+
+fn form_html_block_element_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_remaining_line, (tag_name, _tag_attributes, _tag_type)) = parse_closing_html_tag(line)?;
+    match tag_name {
+        "figure" => Ok(("", (String::from(line), LineType::HTMLFigureBlock, 0))),
+        _ => Ok(("", (String::from(line), LineType::HTMLFigureBlockOpen, 0))),
+    }
 }
 
 fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -785,10 +848,11 @@ fn parse_frontmatter_line(line: &str) -> (Option<String>, LineType) {
 
 fn parse_mdx_line(
     line: &str,
+    open_html_block_elements: Option<&HTMLBlockElementType>,
     open_jsx_component_type: Option<&JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
-    match open_jsx_component_type {
-        Some(JSXComponentType::HowToOpening) => match form_how_to_component_opening_line(line) {
+    match open_html_block_elements {
+        Some(HTMLBlockElementType::Figure) => match form_html_block_element_last_line(line) {
             Ok((_, (line, line_type, level))) => {
                 if !line.is_empty() {
                     Some((line, line_type, level))
@@ -796,65 +860,23 @@ fn parse_mdx_line(
                     None
                 }
             }
-            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+            Err(_) => Some((line.to_string(), LineType::HTMLFigureBlockOpen, 0)),
         },
-        Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
+        // Some(_) => Some((line.to_string(), LineType::HTMLFigureBlock, 0)),
+        None => match open_jsx_component_type {
+            Some(JSXComponentType::HowToOpening) => {
+                match form_how_to_component_opening_line(line) {
+                    Ok((_, (line, line_type, level))) => {
+                        if !line.is_empty() {
+                            Some((line, line_type, level))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
                 }
             }
-            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-        },
-        Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-        },
-        Some(JSXComponentType::FencedCodeBlock) => match alt((
-            form_fenced_code_block_last_line,
-            form_fenced_code_block_import_line,
-            form_fenced_code_block_script_line,
-            form_fenced_code_block_script_open_line,
-        ))(line)
-        {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
-        },
-        Some(JSXComponentType::HowTo) => match alt((
-            form_how_to_component_last_line,
-            form_fenced_code_block_first_line,
-        ))(line)
-        {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
-        },
-        Some(_) => {
-            match alt((
-                form_code_fragment_component_last_line,
-                form_poll_component_last_line,
-                form_video_component_last_line,
-            ))(line)
-            {
+            Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
                 Ok((_, (line, line_type, level))) => {
                     if !line.is_empty() {
                         Some((line, line_type, level))
@@ -863,22 +885,22 @@ fn parse_mdx_line(
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-            }
-        }
-        None => {
-            match alt((
-                form_code_fragment_component_first_line,
-                form_fenced_code_block_first_line,
-                form_how_to_component_first_line,
-                form_image_component,
-                form_poll_component_first_line,
-                form_questions_component,
-                form_tweet_component,
-                form_video_component_first_line,
-                form_heading_line,
-                form_ordered_list_line,
-                form_unordered_list_line,
-                form_inline_wrap_text,
+            },
+            Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+            },
+            Some(JSXComponentType::FencedCodeBlock) => match alt((
+                form_fenced_code_block_last_line,
+                form_fenced_code_block_import_line,
+                form_fenced_code_block_script_line,
+                form_fenced_code_block_script_open_line,
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
@@ -888,9 +910,67 @@ fn parse_mdx_line(
                         None
                     }
                 }
-                Err(_) => None,
+                Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
+            },
+            Some(JSXComponentType::HowTo) => match alt((
+                form_how_to_component_last_line,
+                form_fenced_code_block_first_line,
+            ))(line)
+            {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
+            },
+            Some(_) => {
+                match alt((
+                    form_code_fragment_component_last_line,
+                    form_poll_component_last_line,
+                    form_video_component_last_line,
+                ))(line)
+                {
+                    Ok((_, (line, line_type, level))) => {
+                        if !line.is_empty() {
+                            Some((line, line_type, level))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+                }
             }
-        }
+            None => {
+                match alt((
+                    form_code_fragment_component_first_line,
+                    form_fenced_code_block_first_line,
+                    form_how_to_component_first_line,
+                    form_html_block_element_first_line,
+                    form_image_component,
+                    form_poll_component_first_line,
+                    form_questions_component,
+                    form_tweet_component,
+                    form_video_component_first_line,
+                    form_heading_line,
+                    form_ordered_list_line,
+                    form_unordered_list_line,
+                    form_inline_wrap_text,
+                ))(line)
+                {
+                    Ok((_, (line, line_type, level))) => {
+                        if !line.is_empty() {
+                            Some((line, line_type, level))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None,
+                }
+            }
+        },
     }
 }
 
@@ -952,13 +1032,22 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
 
     let mut current_indentation: usize = 0;
     let mut open_lists = ListStack::new();
-    // let mut open_jsx_component_type: Option<JSXComponentType> = None;
+
+    // used to keep a track of open JSX components
     let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
+
+    // used to keep a track of open block HTML elements
+    let mut open_html_block_element_stack: Stack<HTMLBlockElementType> = Stack::new();
+
     let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
     for line in reader.lines().skip(frontmatter_end_line_number) {
         let line_content = line.unwrap();
-        match parse_mdx_line(&line_content, open_jsx_component_type.peek()) {
+        match parse_mdx_line(
+            &line_content,
+            open_html_block_element_stack.peek(),
+            open_jsx_component_type.peek(),
+        ) {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::OrderedListItem => {
                     if open_lists.is_empty() {
@@ -1035,6 +1124,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     present_jsx_component_types.insert(JSXComponentType::Tweet);
                     tokens.push(line);
                 }
+                LineType::HTMLFigureBlock => {
+                    open_html_block_element_stack.pop();
+                    tokens.push(line);
+                }
                 LineType::FencedCodeBlockOpen => {
                     if open_jsx_component_type.peek() != Some(&JSXComponentType::FencedCodeBlock) {
                         open_jsx_component_type.push(JSXComponentType::FencedCodeBlock);
@@ -1089,6 +1182,12 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 LineType::VideoOpening => {
                     if open_jsx_component_type.peek() != Some(&JSXComponentType::VideoOpening) {
                         open_jsx_component_type.push(JSXComponentType::VideoOpening);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HTMLFigureBlockOpen => {
+                    if open_html_block_element_stack.peek() != Some(&HTMLBlockElementType::Figure) {
+                        open_html_block_element_stack.push(HTMLBlockElementType::Figure);
                     }
                     tokens.push(line);
                 }
