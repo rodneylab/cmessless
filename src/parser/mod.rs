@@ -639,10 +639,11 @@ fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
 
 fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (value, level) = parse_heading_text(line)?;
+    let (_, parsed_text) = parse_inline_wrap_text(value)?;
     Ok((
         "",
         (
-            format!("<h{level}>{value}</h{level}>"),
+            format!("<h{level}>{parsed_text}</h{level}>"),
             LineType::Heading,
             level,
         ),
