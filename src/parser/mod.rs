@@ -6,10 +6,11 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1},
-    combinator::{map, opt, peek, rest, value},
+    combinator::{all_consuming, map, opt, peek, rest, value},
+    error::{Error, ErrorKind},
     multi::{many0, many0_count, many1_count},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    IResult,
+    Err, IResult,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -26,7 +27,7 @@ type ParsedFencedCodeBlockMeta<'a> = (
     Option<&'a str>,
 );
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(PartialEq)]
 enum HTMLBlockElementType {
     Figure,
 }
@@ -50,7 +51,8 @@ enum JSXComponentType {
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum HTMLTagType {
     Opening,
-    // SelfClosing,
+    OpeningStart,
+    SelfClosing,
     Closing,
 }
 
@@ -149,6 +151,10 @@ fn parse_up_to_inline_wrap_segment<'a>(
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
+fn parse_html_tag_attributes_str(line: &str) -> IResult<&str, &str> {
+    is_not(">/")(line)
+}
+
 fn parse_html_tag_content(line: &str) -> IResult<&str, (&str, &str)> {
     let (remainder, tag_content) = is_not(">/")(line)?;
     let (attributes, (tag_name, _space)) = pair(alphanumeric1, multispace0)(tag_content)?;
@@ -173,14 +179,39 @@ fn parse_opening_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)
     ))
 }
 
-// fn parse_self_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
-//     let (remaining_line, (tag_name, tag_attributes)) =
-//         delimited(tag("<"), parse_html_tag_content, tag("/>"))(line)?;
-//     Ok((
-//         remaining_line,
-//         (tag_name, tag_attributes, HTMLTagType::SelfClosing),
-//     ))
-// }
+fn parse_opening_html_tag_start(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
+    let (remaining_line, (tag_name, tag_attributes)) =
+        preceded(tag("<"), parse_html_tag_content)(line)?;
+    Ok((
+        remaining_line,
+        (tag_name, tag_attributes, HTMLTagType::OpeningStart),
+    ))
+}
+
+fn parse_opening_html_tag_end(line: &str) -> IResult<&str, (&str, HTMLTagType)> {
+    let (remaining_line, tag_attributes) = alt((
+        delimited(multispace0, parse_html_tag_attributes_str, tag(">")),
+        terminated(multispace0, tag(">")),
+    ))(line)?;
+    Ok((remaining_line, (tag_attributes, HTMLTagType::Opening)))
+}
+
+fn parse_self_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
+    let (remaining_line, (tag_name, tag_attributes)) =
+        delimited(tag("<"), parse_html_tag_content, tag("/>"))(line)?;
+    Ok((
+        remaining_line,
+        (tag_name, tag_attributes, HTMLTagType::SelfClosing),
+    ))
+}
+
+fn parse_self_closing_html_tag_end(line: &str) -> IResult<&str, (&str, HTMLTagType)> {
+    let (remaining_line, tag_attributes) = alt((
+        delimited(multispace0, parse_html_tag_attributes_str, tag("/>")),
+        terminated(multispace0, tag("/>")),
+    ))(line)?;
+    Ok((remaining_line, (tag_attributes, HTMLTagType::SelfClosing)))
+}
 
 fn parse_up_to_opening_html_tag<'a>(
     line: &'a str,
@@ -446,6 +477,52 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
+fn form_jsx_component_first_line<'a>(
+    line: &'a str,
+    component_identifier: &'a str,
+) -> IResult<&'a str, (String, HTMLTagType, usize)> {
+    let (remaining_line, (component_name, _attributes, tag_type)) = alt((
+        parse_self_closing_html_tag,
+        parse_opening_html_tag,
+        parse_opening_html_tag_start,
+    ))(line)?;
+    all_consuming(tag(component_identifier))(component_name)?; // check names match
+    match tag_type {
+        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
+            Ok((remaining_line, (line.to_string(), tag_type, 0)))
+        }
+        HTMLTagType::Closing => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
+    }
+}
+
+// assumed tag is opened in earlier line and this has been recognised
+fn form_jsx_component_opening_line(line: &str) -> IResult<&str, (String, HTMLTagType, usize)> {
+    let (remaining_line, (_attributes, tag_type)) =
+        alt((parse_self_closing_html_tag_end, parse_opening_html_tag_end))(line)?;
+    match tag_type {
+        HTMLTagType::Opening | HTMLTagType::SelfClosing => {
+            Ok((remaining_line, (line.to_string(), tag_type, 0)))
+        }
+        HTMLTagType::OpeningStart | HTMLTagType::Closing => {
+            Err(Err::Error(Error::new(line, ErrorKind::Tag)))
+        }
+    }
+}
+
+fn form_jsx_component_last_line<'a>(
+    line: &'a str,
+    component_identifier: &'a str,
+) -> IResult<&'a str, (String, HTMLTagType, usize)> {
+    let (_remaining_line, (component_name, _attributes, tag_type)) = parse_closing_html_tag(line)?;
+    all_consuming(tag(component_identifier))(component_name)?; // check names match
+    match tag_type {
+        HTMLTagType::Closing => Ok((_remaining_line, (line.to_string(), tag_type, 0))),
+        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
+            Err(Err::Error(Error::new(line, ErrorKind::Tag)))
+        }
+    }
+}
+
 fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "CodeFragment";
     let (_, (_parsed_value, jsx_tag_type)) =
@@ -458,13 +535,13 @@ fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String,
 }
 
 fn form_how_to_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "HowTo";
-    let (_, (_parsed_value, jsx_tag_type)) =
-        parse_jsx_component_first_line(line, component_identifier)?;
-    match jsx_tag_type {
-        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::HowToOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::HowToOpening, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::HowTo, 0))),
+    let (remaining_line, (markup, tag_type, indentation)) =
+        form_jsx_component_first_line(line, "HowTo")?;
+    match tag_type {
+        HTMLTagType::Opening => Ok((remaining_line, (markup, LineType::HowToOpen, indentation))),
+        HTMLTagType::OpeningStart => Ok(("", (markup, LineType::HowToOpening, indentation))),
+        HTMLTagType::SelfClosing => Ok((remaining_line, (markup, LineType::HowTo, indentation))),
+        HTMLTagType::Closing => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
     }
 }
 
@@ -511,15 +588,18 @@ fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineTyp
     }
 }
 
+// handles the continuation of an opening tag
 fn form_how_to_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (_, line_type) = alt((
-        map(terminated(take_until("/>"), tag("/>")), |_| LineType::HowTo),
-        map(terminated(take_until(">"), tag(">")), |_| {
-            LineType::HowToOpen
-        }),
-        map(rest, |_| LineType::HowToOpening),
-    ))(line)?;
-    Ok(("", (line.to_string(), line_type, 0)))
+    let (remaining_line, (markup, tag_type, indentation)) = form_jsx_component_opening_line(line)?;
+    match tag_type {
+        HTMLTagType::Opening | HTMLTagType::SelfClosing => {
+            Ok((remaining_line, (markup, LineType::HowToOpen, indentation)))
+        }
+        _ => Ok((
+            "",
+            (String::from(line), LineType::HowToOpening, indentation),
+        )),
+    }
 }
 
 fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -602,18 +682,16 @@ fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, 
     ))
 }
 
+// assumed tag is already open
 fn form_how_to_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "HowTo";
-    let (final_segment, initial_segment) =
-        parse_jsx_component_last_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::HowTo,
-            0,
-        ),
-    ))
+    let (remaining_line, (markup, tag_type, indentation)) =
+        form_jsx_component_last_line(line, "HowTo")?;
+    match tag_type {
+        HTMLTagType::Closing => Ok((remaining_line, (markup, LineType::HowTo, indentation))),
+        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
+            Ok((remaining_line, (markup, LineType::HowToOpen, indentation)))
+        }
+    }
 }
 
 fn form_poll_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -862,7 +940,6 @@ fn parse_mdx_line(
             }
             Err(_) => Some((line.to_string(), LineType::HTMLFigureBlockOpen, 0)),
         },
-        // Some(_) => Some((line.to_string(), LineType::HTMLFigureBlock, 0)),
         None => match open_jsx_component_type {
             Some(JSXComponentType::HowToOpening) => {
                 match form_how_to_component_opening_line(line) {
@@ -873,7 +950,7 @@ fn parse_mdx_line(
                             None
                         }
                     }
-                    Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+                    Err(_) => Some((line.to_string(), LineType::HowToOpening, 0)),
                 }
             }
             Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
@@ -913,8 +990,8 @@ fn parse_mdx_line(
                 Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
             },
             Some(JSXComponentType::HowTo) => match alt((
-                form_how_to_component_last_line,
                 form_fenced_code_block_first_line,
+                form_how_to_component_last_line,
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
@@ -1149,7 +1226,11 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     tokens.push(line);
                 }
                 LineType::HowToOpen => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::HowTo) {
+                    let current_open_jsx_component = open_jsx_component_type.peek();
+                    if current_open_jsx_component == Some(&JSXComponentType::HowToOpening) {
+                        open_jsx_component_type.pop();
+                        open_jsx_component_type.push(JSXComponentType::HowTo);
+                    } else if current_open_jsx_component != Some(&JSXComponentType::HowTo) {
                         open_jsx_component_type.push(JSXComponentType::HowTo);
                     }
                     tokens.push(line);

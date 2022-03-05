@@ -2,15 +2,17 @@ use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
     form_fenced_code_block_first_line, form_fenced_code_block_import_line,
     form_fenced_code_block_script_line, form_html_anchor_element_line, form_inline_wrap_text,
-    form_ordered_list_line, parse_closing_html_tag, parse_fenced_code_block_first_line,
-    parse_fenced_code_block_import_line, parse_fenced_code_block_script_line, parse_heading_text,
-    parse_href_scheme, parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
+    form_jsx_component_first_line, form_ordered_list_line, parse_closing_html_tag,
+    parse_fenced_code_block_first_line, parse_fenced_code_block_import_line,
+    parse_fenced_code_block_script_line, parse_heading_text, parse_href_scheme,
+    parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
-    parse_opening_html_tag_no_attributes, parse_opening_html_tag_with_attributes,
-    parse_ordered_list_text, parse_self_closing_html_tag, parse_unordered_list_text,
-    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, segment_emphasis_line,
-    segment_strong_emphasis_line, HTMLTagType, JSXTagType, LineType,
+    parse_opening_html_tag_end, parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
+    parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
+    parse_self_closing_html_tag_end, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
+    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, HTMLTagType,
+    JSXTagType, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -190,6 +192,33 @@ pub fn test_form_inline_wrap_text() {
     assert_eq!(
         form_inline_wrap_text(mdx_line),
         Ok(("", (String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"), LineType::Paragraph, 0)))
+    );
+}
+
+#[test]
+pub fn test_form_jsx_component_first_line() {
+    let mdx_line = "<Component />";
+    assert_eq!(
+        form_jsx_component_first_line(mdx_line, "Component"),
+        Ok((
+            "",
+            (String::from("<Component />"), HTMLTagType::SelfClosing, 0)
+        ))
+    );
+
+    let mdx_line = "<ComponentPure />";
+    assert_eq!(
+        form_jsx_component_first_line(mdx_line, "Component"),
+        Err(Err::Error(Error::new("Pure", ErrorKind::Eof)))
+    );
+
+    let mdx_line = "<Component";
+    assert_eq!(
+        form_jsx_component_first_line(mdx_line, "Component"),
+        Ok((
+            "",
+            (String::from("<Component"), HTMLTagType::OpeningStart, 0)
+        ))
     );
 }
 
@@ -476,6 +505,60 @@ pub fn test_parse_opening_html_tag() {
     assert_eq!(
         parse_opening_html_tag(tag),
         Ok((" ", ("main", "class=\"container\" ", HTMLTagType::Opening)))
+    );
+}
+
+#[test]
+pub fn test_parse_opening_html_tag_end() {
+    let tag = " class=\"container\" >";
+    assert_eq!(
+        parse_opening_html_tag_end(tag),
+        Ok(("", ("class=\"container\" ", HTMLTagType::Opening)))
+    );
+
+    let tag = "> ";
+    assert_eq!(
+        parse_opening_html_tag_end(tag),
+        Ok((" ", ("", HTMLTagType::Opening)))
+    );
+}
+
+#[test]
+pub fn test_parse_opening_html_tag_start() {
+    let tag = "<main class=\"container\" ";
+    assert_eq!(
+        parse_opening_html_tag_start(tag),
+        Ok((
+            "",
+            ("main", "class=\"container\" ", HTMLTagType::OpeningStart)
+        ))
+    );
+
+    let tag = "<main";
+    assert_eq!(
+        parse_opening_html_tag_start(tag),
+        Ok(("", ("main", "", HTMLTagType::OpeningStart)))
+    );
+
+    let tag = "<main  ";
+    assert_eq!(
+        parse_opening_html_tag_start(tag),
+        Ok(("", ("main", "", HTMLTagType::OpeningStart)))
+    );
+}
+
+#[test]
+pub fn test_parse_self_closing_html_tag_end() {
+    let tag = " class=\"container\" />";
+    assert_eq!(
+        parse_self_closing_html_tag_end(tag),
+        Ok(("", ("class=\"container\" ", HTMLTagType::SelfClosing)))
+    );
+
+    let tag = "/> ";
+    assert_eq!(
+        parse_self_closing_html_tag_end(tag),
+        Ok((" ", ("", HTMLTagType::SelfClosing)))
     );
 }
 
