@@ -261,7 +261,7 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     let (_, (initial_segment, bold_segment, final_segment)) = segment_code_span_line(line)?;
     Ok((
         final_segment,
-        format!("{initial_segment}<code>{bold_segment}</code>"),
+        format!("{initial_segment}<InlineCodeFragment code={{`{bold_segment}`}} />"),
     ))
 }
 
@@ -692,7 +692,10 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
     let mut define_slug = false;
     let mut image_data_imports: Vec<String> = Vec::new();
 
-    result.push(String::from("---"));
+    result.push(String::from(
+        "---
+import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
+    ));
     if components.contains(&JSXComponentType::CodeFragment) {
         result.push(String::from(
             "import CodeFragment from '$components/CodeFragmentCore.tsx';",
