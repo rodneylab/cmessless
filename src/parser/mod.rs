@@ -121,12 +121,17 @@ fn slugify_title(title: &str) -> String {
         ),
         Err(_) => {
             let mut result = String::new();
-            let remove_characters = "?`:";
-            let replace_characters = " ";
+            let mut last_was_replaced = false;
+            let remove_characters = "?`:[]";
+            let replace_characters = " /-"; // include '-' here to avoid "--" in result
             for chars in deunicode(title).chars() {
                 if replace_characters.contains(chars) {
-                    result.push('-')
+                    if !last_was_replaced {
+                        last_was_replaced = true;
+                        result.push('-');
+                    }
                 } else if !remove_characters.contains(chars) {
+                    last_was_replaced = false;
                     result.push_str(&chars.to_lowercase().to_string());
                 }
             }

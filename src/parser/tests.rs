@@ -431,7 +431,7 @@ pub fn test_parse_mdx_line() {
         parse_mdx_line(mdx_line, None, None),
         Some((
             String::from(
-                "<h1 id=\"getting-started-with-newtech--\">Getting Started with NewTech  </h1>"
+                "<h1 id=\"getting-started-with-newtech-\">Getting Started with NewTech  </h1>"
             ),
             LineType::Heading,
             1
