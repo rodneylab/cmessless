@@ -487,9 +487,9 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push('}');
     };
     if let Some(value) = highlight_line_numbers_option {
-        markup.push_str("\n  highlightLines=\"");
+        markup.push_str("\n  highlightLines={`");
         markup.push_str(value);
-        markup.push('\"');
+        markup.push_str("`}");
     };
     if let Some(value) = title_option {
         markup.push_str("\n  title=\"");
