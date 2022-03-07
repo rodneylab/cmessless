@@ -34,6 +34,9 @@ struct Cli {
     #[clap(short, long)]
     verbose: bool,
 
+    #[clap(short = 'V', long)]
+    version: bool,
+
     #[clap(short, long)]
     watch: bool,
 
@@ -205,6 +208,11 @@ fn main() -> Result<()> {
         print_long_banner();
     } else {
         print_short_banner();
+    }
+
+    if cli.version {
+        println!("{}", get_title());
+        return Ok(());
     }
 
     if cli.watch {
