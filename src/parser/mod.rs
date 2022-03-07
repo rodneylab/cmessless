@@ -864,7 +864,7 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
     }
     if components.contains(&JSXComponentType::Questions) {
         result.push(String::from(
-            "import Questions from '$components/Questions.svelte'",
+            "import Questions from '$components/Questions.svelte';",
         ));
         result.push(format!(
             "import questions from '$content/blog/{slug}/questions.json';"
