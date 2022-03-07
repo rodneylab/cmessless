@@ -11,8 +11,8 @@ use crate::parser::{
     parse_opening_html_tag_end, parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
     parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
     parse_self_closing_html_tag_end, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line,
-    slugify_title, HTMLTagType, JSXTagType, LineType,
+    parse_up_to_opening_html_tag, remove_html_tags, segment_emphasis_line,
+    segment_strong_emphasis_line, slugify_title, HTMLTagType, JSXTagType, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -643,6 +643,12 @@ pub fn test_parse_up_to_opening_html_tag() {
 }
 
 #[test]
+pub fn test_remove_html_tags() {
+    let mdx_line = "Hello <img src=\"image.avif\" />it's me";
+    assert_eq!(remove_html_tags(mdx_line), Ok(("it's me", "Hello ")));
+}
+
+#[test]
 pub fn test_segment_strong_emphasis_line() {
     let mdx_line = "NewTech was **first** set up to solve the **common problem** coming up for identifiers in computer science.";
     assert_eq!(segment_strong_emphasis_line(mdx_line), Ok(("", ("NewTech was ", "first", " set up to solve the **common problem** coming up for identifiers in computer science."))));
@@ -667,6 +673,12 @@ pub fn test_segment_emphasis_line() {
 #[test]
 pub fn test_slugify_title() {
     let title = "🏄🏽 All about Surf";
+    assert_eq!(
+        slugify_title(title),
+        String::from("surfer-skin-tone-4-all-about-surf")
+    );
+
+    let title = "🏄🏽 All <img src=\"my-picture.jpg\" />about Surf";
     assert_eq!(
         slugify_title(title),
         String::from("surfer-skin-tone-4-all-about-surf")

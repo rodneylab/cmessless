@@ -106,18 +106,33 @@ fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
 }
 
+fn remove_html_tags(line: &str) -> IResult<&str, &str> {
+    let (remaining_line, initial_segment) = take_until("<")(line)?;
+    let (final_segment, _) = parse_self_closing_html_tag(remaining_line)?;
+    Ok((final_segment, initial_segment))
+}
+
 fn slugify_title(title: &str) -> String {
-    let mut result = String::new();
-    let remove_characters = "?";
-    let replace_characters = " ";
-    for chars in deunicode(title).chars() {
-        if replace_characters.contains(chars) {
-            result.push('-')
-        } else if !remove_characters.contains(chars) {
-            result.push_str(&chars.to_lowercase().to_string());
+    match remove_html_tags(title) {
+        Ok((final_value, initial_value)) => format!(
+            "{}{}",
+            slugify_title(initial_value),
+            slugify_title(final_value)
+        ),
+        Err(_) => {
+            let mut result = String::new();
+            let remove_characters = "?`:";
+            let replace_characters = " ";
+            for chars in deunicode(title).chars() {
+                if replace_characters.contains(chars) {
+                    result.push('-')
+                } else if !remove_characters.contains(chars) {
+                    result.push_str(&chars.to_lowercase().to_string());
+                }
+            }
+            result
         }
     }
-    result
 }
 
 fn parse_author_name_from_cargo_pkg_authors(cargo_pkg_authors: &str) -> IResult<&str, &str> {
@@ -792,7 +807,7 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
         (
             format!(
                 "<h{level} id=\"{}\">{parsed_text}</h{level}>",
-                slugify_title(&parsed_text)
+                slugify_title(value)
             ),
             LineType::Heading,
             level,
