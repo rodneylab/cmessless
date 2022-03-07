@@ -21,10 +21,11 @@ use std::{
 };
 
 type ParsedFencedCodeBlockMeta<'a> = (
-    Option<&'a str>,
-    Option<&'a str>,
-    Option<&'a str>,
-    Option<&'a str>,
+    Option<&'a str>, // language
+    Option<&'a str>, // first line number
+    Option<&'a str>, // highlight line numbers
+    Option<&'a str>, // title
+    Option<bool>,    //collapse
 );
 
 #[derive(PartialEq)]
@@ -335,7 +336,15 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
         delimited(peek(tag("{")), is_not(" \t\r\n"), tag(" ")),
         preceded(peek(tag("{")), is_not(" \t\r\n")),
     )))(remaining_meta)?;
-    let (_, title_option) = opt(delimited(tag("\""), take_until("\""), tag("\"")))(remaining_meta)?;
+    let (remaining_meta, title_option) = opt(alt((
+        delimited(tag("\""), take_until("\" "), tag("\" ")),
+        delimited(tag("\""), take_until("\""), tag("\"")),
+    )))(remaining_meta)?;
+    let (_, collapse_option_tag) = opt(tag("<>"))(remaining_meta)?;
+    let collapse_option = match collapse_option_tag {
+        Some("<>") => Some(true),
+        _ => Some(false),
+    };
     Ok((
         "",
         (
@@ -343,6 +352,7 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
             first_line_number_option,
             highlight_lines_option,
             title_option,
+            collapse_option,
         ),
     ))
 }
@@ -421,7 +431,13 @@ fn form_html_block_element_last_line(line: &str) -> IResult<&str, (String, LineT
 fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (
         _,
-        (language_option, first_line_number_option, highlight_line_numbers_option, title_option),
+        (
+            language_option,
+            first_line_number_option,
+            highlight_line_numbers_option,
+            title_option,
+            collapse_option,
+        ),
     ) = parse_fenced_code_block_first_line(line)?;
 
     let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
@@ -444,6 +460,9 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str("\n  title=\"");
         markup.push_str(value);
         markup.push('\"');
+    };
+    if let Some(true) = collapse_option {
+        markup.push_str("\n  collapse");
     };
     markup.push_str("\n  code={`\n<!--");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
