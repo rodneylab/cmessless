@@ -11,8 +11,8 @@ use crate::parser::{
     parse_opening_html_tag_end, parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
     parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
     parse_self_closing_html_tag_end, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line, HTMLTagType,
-    JSXTagType, LineType,
+    parse_up_to_opening_html_tag, segment_emphasis_line, segment_strong_emphasis_line,
+    slugify_title, HTMLTagType, JSXTagType, LineType,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -430,17 +430,21 @@ pub fn test_parse_mdx_line() {
     assert_eq!(
         parse_mdx_line(mdx_line, None, None),
         Some((
-            String::from("<h1>Getting Started with NewTech  </h1>"),
+            String::from(
+                "<h1 id=\"getting-started-with-newtech--\">Getting Started with NewTech  </h1>"
+            ),
             LineType::Heading,
             1
         ))
     );
 
-    let mdx_line = "### What Does All This Mean?";
+    let mdx_line = "### 😕 What Does All This Mean?";
     assert_eq!(
         parse_mdx_line(mdx_line, None, None),
         Some((
-            String::from("<h3>What Does All This Mean?</h3>"),
+            String::from(
+                "<h3 id=\"confused-what-does-all-this-mean\">😕 What Does All This Mean?</h3>"
+            ),
             LineType::Heading,
             3
         ))
@@ -657,5 +661,14 @@ pub fn test_segment_emphasis_line() {
                 " the common problem coming up for identifiers in *computer* science."
             )
         ))
+    );
+}
+
+#[test]
+pub fn test_slugify_title() {
+    let title = "🏄🏽 All about Surf";
+    assert_eq!(
+        slugify_title(title),
+        String::from("surfer-skin-tone-4-all-about-surf")
     );
 }

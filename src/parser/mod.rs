@@ -2,6 +2,7 @@
 mod tests;
 use crate::utility::stack::Stack;
 
+use deunicode::deunicode;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
@@ -103,6 +104,20 @@ enum ListType {
 #[allow(dead_code)]
 fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
+}
+
+fn slugify_title(title: &str) -> String {
+    let mut result = String::new();
+    let remove_characters = "?";
+    let replace_characters = " ";
+    for chars in deunicode(title).chars() {
+        if replace_characters.contains(chars) {
+            result.push('-')
+        } else if !remove_characters.contains(chars) {
+            result.push_str(&chars.to_lowercase().to_string());
+        }
+    }
+    result
 }
 
 fn parse_author_name_from_cargo_pkg_authors(cargo_pkg_authors: &str) -> IResult<&str, &str> {
@@ -775,7 +790,10 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     Ok((
         "",
         (
-            format!("<h{level}>{parsed_text}</h{level}>"),
+            format!(
+                "<h{level} id=\"{}\">{parsed_text}</h{level}>",
+                slugify_title(&parsed_text)
+            ),
             LineType::Heading,
             level,
         ),
@@ -831,7 +849,7 @@ import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
     ));
     if components.contains(&JSXComponentType::CodeFragment) {
         result.push(String::from(
-            "import CodeFragment from '$components/CodeFragmentCore.tsx';",
+            "import CodeFragment from '$components/CodeFragment.tsx';",
         ));
     }
     if components.contains(&JSXComponentType::HowTo) {
