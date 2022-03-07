@@ -99,34 +99,6 @@ enum ListType {
     Unordered,
 }
 
-struct ListStack {
-    structure: Vec<ListType>,
-}
-
-impl ListStack {
-    fn new() -> Self {
-        ListStack {
-            structure: Vec::new(),
-        }
-    }
-
-    fn pop(&mut self) -> Option<ListType> {
-        self.structure.pop()
-    }
-
-    fn push(&mut self, element: ListType) {
-        self.structure.push(element)
-    }
-
-    fn len(&self) -> usize {
-        self.structure.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.structure.is_empty()
-    }
-}
-
 #[allow(dead_code)]
 fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
@@ -1108,7 +1080,8 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let reader = BufReader::new(&file);
 
     let mut current_indentation: usize = 0;
-    let mut open_lists = ListStack::new();
+    // let mut open_lists = ListStack::new();
+    let mut open_lists = Stack::new();
 
     // used to keep a track of open JSX components
     let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();

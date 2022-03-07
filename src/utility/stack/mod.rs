@@ -21,11 +21,11 @@ impl<T> Stack<T> {
         self.structure.push(element)
     }
 
-    // fn len(&self) -> usize {
-    //     self.structure.len()
-    // }
+    pub fn len(&self) -> usize {
+        self.structure.len()
+    }
 
-    // fn is_empty(&self) -> bool {
-    //     self.structure.is_empty()
-    // }
+    pub fn is_empty(&self) -> bool {
+        self.structure.is_empty()
+    }
 }
