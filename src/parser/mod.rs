@@ -26,6 +26,7 @@ type ParsedFencedCodeBlockMeta<'a> = (
     Option<&'a str>, // first line number
     Option<&'a str>, // highlight line numbers
     Option<&'a str>, // title
+    Option<&'a str>, // caption
     Option<bool>,    //collapse
 );
 
@@ -387,6 +388,10 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
         delimited(tag("\""), take_until("\" "), tag("\" ")),
         delimited(tag("\""), take_until("\""), tag("\"")),
     )))(remaining_meta)?;
+    let (remaining_meta, caption_option) = opt(alt((
+        delimited(tag("["), take_until("] "), tag("] ")),
+        delimited(tag("["), take_until("]"), tag("]")),
+    )))(remaining_meta)?;
     let (_, collapse_option_tag) = opt(tag("<>"))(remaining_meta)?;
     let collapse_option = match collapse_option_tag {
         Some("<>") => Some(true),
@@ -399,6 +404,7 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
             first_line_number_option,
             highlight_lines_option,
             title_option,
+            caption_option,
             collapse_option,
         ),
     ))
@@ -511,6 +517,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
             first_line_number_option,
             highlight_line_numbers_option,
             title_option,
+            caption_option,
             collapse_option,
         ),
     ) = parse_fenced_code_block_first_line(line)?;
@@ -533,6 +540,11 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
     };
     if let Some(value) = title_option {
         markup.push_str("\n  title=\"");
+        markup.push_str(value);
+        markup.push('\"');
+    };
+    if let Some(value) = caption_option {
+        markup.push_str("\n  caption=\"");
         markup.push_str(value);
         markup.push('\"');
     };

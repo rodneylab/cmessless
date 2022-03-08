@@ -425,7 +425,7 @@ pub fn test_form_table_header_row() {
 
 #[test]
 pub fn test_parse_fenced_code_block_first_line() {
-    let mdx_line = "```plaintext {5,7} \".env\"";
+    let mdx_line = "```plaintext {5,7} \".env\" [A code block all about maths]";
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
         Ok((
@@ -435,6 +435,7 @@ pub fn test_parse_fenced_code_block_first_line() {
                 None,
                 Some("{5,7}"),
                 Some(".env"),
+                Some("A code block all about maths"),
                 Some(false)
             )
         ))
@@ -443,7 +444,7 @@ pub fn test_parse_fenced_code_block_first_line() {
     let mdx_line = "```plaintext";
     assert_eq!(
         parse_fenced_code_block_first_line(mdx_line),
-        Ok(("", (Some("plaintext"), None, None, None, Some(false))))
+        Ok(("", (Some("plaintext"), None, None, None, None, Some(false))))
     );
 
     let mdx_line = "```plaintext {5,7}";
@@ -451,7 +452,14 @@ pub fn test_parse_fenced_code_block_first_line() {
         parse_fenced_code_block_first_line(mdx_line),
         Ok((
             "",
-            (Some("plaintext"), None, Some("{5,7}"), None, Some(false))
+            (
+                Some("plaintext"),
+                None,
+                Some("{5,7}"),
+                None,
+                None,
+                Some(false)
+            )
         ))
     );
 
@@ -464,6 +472,7 @@ pub fn test_parse_fenced_code_block_first_line() {
                 Some("plaintext"),
                 Some("2"),
                 Some("{5,7}"),
+                None,
                 None,
                 Some(false)
             )
@@ -479,6 +488,7 @@ pub fn test_parse_fenced_code_block_first_line() {
                 Some("plaintext"),
                 Some("2"),
                 Some("{5,7}"),
+                None,
                 None,
                 Some(true)
             )
