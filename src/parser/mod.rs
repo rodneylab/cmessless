@@ -1323,7 +1323,8 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                         while open_lists.pop() != Some(ListType::Ordered) {
                             tokens.push(String::from("</ul>"));
                         }
-                        tokens.push(String::from("</ol>"));
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
+                        tokens.push(format!("</ol>\n{list_item_indentation}{line}"));
                     }
                     current_indentation = indentation
                 }
