@@ -1013,6 +1013,7 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
         ));
     }
     if components.contains(&JSXComponentType::Poll) {
+        define_slug = true;
         result.push(String::from("import Poll from '$components/Poll.svelte';"));
     }
     if components.contains(&JSXComponentType::Questions) {
