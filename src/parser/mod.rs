@@ -1271,7 +1271,6 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let reader = BufReader::new(&file);
 
     let mut current_indentation: usize = 0;
-    // let mut open_lists = ListStack::new();
     let mut open_lists = Stack::new();
 
     // used to keep a track of open JSX components
@@ -1324,7 +1323,8 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                         while open_lists.pop() != Some(ListType::Unordered) {
                             tokens.push(String::from("</ol>"));
                         }
-                        tokens.push(String::from("</ul>"));
+                        let list_item_indentation = " ".repeat(2 * open_lists.len());
+                        tokens.push(format!("</ul>\n{list_item_indentation}{line}"));
                     }
                     current_indentation = indentation
                 }
