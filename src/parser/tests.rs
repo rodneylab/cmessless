@@ -2,7 +2,9 @@ use crate::parser::{
     discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
     form_fenced_code_block_first_line, form_fenced_code_block_import_line,
     form_fenced_code_block_script_line, form_html_anchor_element_line, form_inline_wrap_text,
-    form_jsx_component_first_line, form_ordered_list_line, parse_closing_html_tag,
+    form_jsx_component_first_line, form_ordered_list_line, form_table_body_last_line,
+    form_table_body_row, form_table_head_first_line, form_table_head_last_line,
+    form_table_head_row, form_table_header_row, parse_closing_html_tag,
     parse_fenced_code_block_first_line, parse_fenced_code_block_import_line,
     parse_fenced_code_block_script_line, parse_heading_text, parse_href_scheme,
     parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
@@ -10,9 +12,11 @@ use crate::parser::{
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
     parse_opening_html_tag_end, parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
     parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
-    parse_self_closing_html_tag_end, parse_unordered_list_text, parse_up_to_inline_wrap_segment,
-    parse_up_to_opening_html_tag, remove_html_tags, segment_emphasis_line,
-    segment_strong_emphasis_line, slugify_title, HTMLTagType, JSXTagType, LineType,
+    parse_self_closing_html_tag_end, parse_table_cell, parse_table_column_alignment,
+    parse_table_header_row, parse_table_line, parse_unordered_list_text,
+    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, remove_html_tags,
+    segment_emphasis_line, segment_strong_emphasis_line, slugify_title, HTMLTagType, JSXTagType,
+    LineType, TableAlign,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -259,6 +263,160 @@ pub fn test_form_ordered_list_line() {
             (
                 String::from("<li>first things <strong>before</strong> second things</li>"),
                 LineType::OrderedListItem,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_body_last_line() {
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    assert_eq!(
+        form_table_body_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from(
+                    "    <tr>
+      <td>1 January </td>
+      <td>Central London </td>
+      <td>Sunny </td>
+    </tr>"
+                ),
+                LineType::HTMLTableBodyOpen,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "\n";
+    assert_eq!(
+        form_table_body_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("  </tbody>\n</table>"),
+                LineType::HTMLTableBody,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_body_row() {
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    assert_eq!(
+        form_table_body_row(mdx_line),
+        Ok((
+            "",
+            (
+                String::from(
+                    "    <tr>
+      <td>1 January </td>
+      <td>Central London </td>
+      <td>Sunny </td>
+    </tr>"
+                ),
+                LineType::HTMLTableBodyOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_head_first_line() {
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    assert_eq!(
+        form_table_head_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from(
+                    "<table>
+  <thead>
+    <tr>
+      <th scope=\"col\">1 January </th>
+      <th scope=\"col\">Central London </th>
+      <th scope=\"col\">Sunny </th>
+    </tr>"
+                ),
+                LineType::HTMLTableHeadOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_head_last_line() {
+    let mdx_line = "| :--- | :---: | ---: |";
+    assert_eq!(
+        form_table_head_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("  </thead>\n  <tbody>"),
+                LineType::HTMLTableBodyOpen,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    assert_eq!(
+        form_table_head_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from(
+                    "    <tr>
+      <th scope=\"col\">1 January </th>
+      <th scope=\"col\">Central London </th>
+      <th scope=\"col\">Sunny </th>
+    </tr>"
+                ),
+                LineType::HTMLTableHeadOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_head_row() {
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    assert_eq!(
+        form_table_head_row(mdx_line),
+        Ok((
+            "",
+            (
+                String::from(
+                    "    <tr>
+      <th scope=\"col\">1 January </th>
+      <th scope=\"col\">Central London </th>
+      <th scope=\"col\">Sunny </th>
+    </tr>"
+                ),
+                LineType::HTMLTableHeadOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_table_header_row() {
+    let mdx_line = "| :--- | :---: | ---: |";
+    assert_eq!(
+        form_table_header_row(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("  </thead>\n  <tbody>"),
+                LineType::HTMLTableBodyOpen,
                 0
             )
         ))
@@ -613,6 +771,58 @@ pub fn test_parse_self_closing_html_tag_end() {
         parse_self_closing_html_tag_end(tag),
         Ok((" ", ("", HTMLTagType::SelfClosing)))
     );
+}
+
+#[test]
+pub fn test_parse_table_cell() {
+    let mdx_line = "1 January | Central London |";
+    assert_eq!(
+        parse_table_cell(mdx_line),
+        Ok(("Central London |", "1 January "))
+    );
+}
+
+#[test]
+pub fn test_parse_table_column_alignment() {
+    let mdx_line = ":--- | ---: |";
+    assert_eq!(
+        parse_table_column_alignment(mdx_line),
+        Ok(("---: |", TableAlign::Left))
+    );
+
+    let mdx_line = ":---: | ---: |";
+    assert_eq!(
+        parse_table_column_alignment(mdx_line),
+        Ok(("---: |", TableAlign::Centre))
+    );
+
+    let mdx_line = "---: | ---: |";
+    assert_eq!(
+        parse_table_column_alignment(mdx_line),
+        Ok(("---: |", TableAlign::Right))
+    );
+}
+
+#[test]
+pub fn test_parse_table_header_row() {
+    let mdx_line = "| :--- | :---: | ---: |";
+    let (remaining_line, result) = parse_table_header_row(mdx_line).unwrap();
+    assert_eq!(remaining_line, "");
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0], TableAlign::Left);
+    assert_eq!(result[1], TableAlign::Centre);
+    assert_eq!(result[2], TableAlign::Right);
+}
+
+#[test]
+pub fn test_parse_table_line() {
+    let mdx_line = "| 1 January | Central London | Sunny |";
+    let (remaining_line, result) = parse_table_line(mdx_line).unwrap();
+    assert_eq!(remaining_line, "");
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0], "1 January ");
+    assert_eq!(result[1], "Central London ");
+    assert_eq!(result[2], "Sunny ");
 }
 
 #[test]

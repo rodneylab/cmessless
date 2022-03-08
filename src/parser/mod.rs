@@ -9,7 +9,7 @@ use nom::{
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1},
     combinator::{all_consuming, map, opt, peek, rest, value},
     error::{Error, ErrorKind},
-    multi::{many0, many0_count, many1_count},
+    multi::{many0, many0_count, many1, many1_count},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     Err, IResult,
 };
@@ -32,6 +32,8 @@ type ParsedFencedCodeBlockMeta<'a> = (
 #[derive(PartialEq)]
 enum HTMLBlockElementType {
     Figure,
+    TableBody,
+    TableHead,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -78,6 +80,9 @@ enum LineType {
     Heading,
     HTMLFigureBlockOpen,
     HTMLFigureBlock,
+    HTMLTableBodyOpen,
+    HTMLTableBody,
+    HTMLTableHeadOpen,
     HowTo,
     HowToOpen,
     HowToOpening,
@@ -99,6 +104,13 @@ enum LineType {
 enum ListType {
     Ordered,
     Unordered,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum TableAlign {
+    Centre,
+    Left,
+    Right,
 }
 
 #[allow(dead_code)]
@@ -447,6 +459,34 @@ fn parse_jsx_component_last_line<'a>(
     result
 }
 
+fn parse_table_column_alignment(line: &str) -> IResult<&str, TableAlign> {
+    let (remaining_line, cell) = terminated(take_until("|"), pair(tag("|"), multispace0))(line)?;
+    let (_, alignment) = alt((
+        value(
+            TableAlign::Centre,
+            delimited(tag(":"), tag("---"), tag(":")),
+        ),
+        value(TableAlign::Left, preceded(tag(":"), tag("---"))),
+        value(TableAlign::Right, terminated(tag("---"), tag(":"))),
+    ))(cell)?;
+    Ok((remaining_line, alignment))
+}
+
+fn parse_table_cell(line: &str) -> IResult<&str, &str> {
+    terminated(take_until("|"), pair(tag("|"), multispace0))(line)
+}
+
+// parses row separating header and body containing alignment markers
+fn parse_table_header_row(line: &str) -> IResult<&str, Vec<TableAlign>> {
+    let (headings, _) = preceded(tag("|"), multispace1)(line)?;
+    many1(parse_table_column_alignment)(headings)
+}
+
+fn parse_table_line(line: &str) -> IResult<&str, Vec<&str>> {
+    let (headings, _) = preceded(tag("|"), multispace1)(line)?;
+    many1(parse_table_cell)(headings)
+}
+
 fn form_html_block_element_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_remaining_line, (tag_name, _tag_attributes, _tag_type)) = parse_opening_html_tag(line)?;
     match tag_name {
@@ -601,6 +641,72 @@ fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usiz
         "",
         (format!("<Questions{attributes}/>"), LineType::Questions, 0),
     ))
+}
+
+fn form_table_body_row(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, cells) = parse_table_line(line)?;
+    let mut markup = String::from("    <tr>");
+    for cell in cells {
+        markup.push_str("\n      <td>");
+        markup.push_str(cell);
+        markup.push_str("</td>");
+    }
+    markup.push_str("\n    </tr>");
+    Ok(("", (markup, LineType::HTMLTableBodyOpen, 0)))
+}
+
+// regular row in table head
+fn form_table_head_row(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, cells) = parse_table_line(line)?;
+    let mut markup = String::from("    <tr>");
+    for cell in cells {
+        markup.push_str("\n      <th scope=\"col\">");
+        markup.push_str(cell);
+        markup.push_str("</th>");
+    }
+    markup.push_str("\n    </tr>");
+    Ok(("", (markup, LineType::HTMLTableHeadOpen, 0)))
+}
+
+// special row between head and body with alignment markers
+fn form_table_header_row(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    parse_table_header_row(line)?;
+    Ok((
+        "",
+        (
+            String::from("  </thead>\n  <tbody>"),
+            LineType::HTMLTableBodyOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_table_body_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    match form_table_body_row(line) {
+        Ok(value) => Ok(value),
+        Err(_) => Ok((
+            "",
+            (
+                String::from("  </tbody>\n</table>"),
+                LineType::HTMLTableBody,
+                0,
+            ),
+        )),
+    }
+}
+
+fn form_table_head_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (_, (row_body, line_type, indentation)) = form_table_head_row(line)?;
+    let markup = String::from("<table>\n  <thead>");
+    Ok((
+        "",
+        (format!("{markup}\n{row_body}"), line_type, indentation),
+    ))
+}
+
+// optimistically try to end the head section or alternatively add additional head line
+fn form_table_head_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    alt((form_table_header_row, form_table_head_row))(line)
 }
 
 fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -969,6 +1075,14 @@ fn parse_mdx_line(
             }
             Err(_) => Some((line.to_string(), LineType::HTMLFigureBlockOpen, 0)),
         },
+        Some(HTMLBlockElementType::TableBody) => match form_table_body_last_line(line) {
+            Ok((_, value)) => Some(value),
+            Err(_) => None,
+        },
+        Some(HTMLBlockElementType::TableHead) => match form_table_head_last_line(line) {
+            Ok((_, value)) => Some(value),
+            Err(_) => None,
+        },
         None => match open_jsx_component_type {
             Some(JSXComponentType::HowToOpening) => {
                 match form_how_to_component_opening_line(line) {
@@ -1055,6 +1169,7 @@ fn parse_mdx_line(
                     form_fenced_code_block_first_line,
                     form_how_to_component_first_line,
                     form_html_block_element_first_line,
+                    form_table_head_first_line,
                     form_image_component,
                     form_poll_component_first_line,
                     form_questions_component,
@@ -1235,6 +1350,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     open_html_block_element_stack.pop();
                     tokens.push(line);
                 }
+                LineType::HTMLTableBody => {
+                    open_html_block_element_stack.pop();
+                    tokens.push(line);
+                }
                 LineType::FencedCodeBlockOpen => {
                     if open_jsx_component_type.peek() != Some(&JSXComponentType::FencedCodeBlock) {
                         open_jsx_component_type.push(JSXComponentType::FencedCodeBlock);
@@ -1299,6 +1418,23 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 LineType::HTMLFigureBlockOpen => {
                     if open_html_block_element_stack.peek() != Some(&HTMLBlockElementType::Figure) {
                         open_html_block_element_stack.push(HTMLBlockElementType::Figure);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HTMLTableHeadOpen => {
+                    if open_html_block_element_stack.peek()
+                        != Some(&HTMLBlockElementType::TableHead)
+                    {
+                        open_html_block_element_stack.push(HTMLBlockElementType::TableHead);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HTMLTableBodyOpen => {
+                    if open_html_block_element_stack.peek()
+                        != Some(&HTMLBlockElementType::TableBody)
+                    {
+                        open_html_block_element_stack.pop();
+                        open_html_block_element_stack.push(HTMLBlockElementType::TableBody);
                     }
                     tokens.push(line);
                 }
