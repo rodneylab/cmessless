@@ -1077,10 +1077,9 @@ fn parse_frontmatter_line(line: &str) -> (Option<String>, LineType) {
     }
 }
 
-fn parse_mdx_line(
+fn parse_open_html_block(
     line: &str,
     open_html_block_elements: Option<&HTMLBlockElementType>,
-    open_jsx_component_type: Option<&JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
     match open_html_block_elements {
         Some(HTMLBlockElementType::Figure) => match form_html_block_element_last_line(line) {
@@ -1101,44 +1100,81 @@ fn parse_mdx_line(
             Ok((_, value)) => Some(value),
             Err(_) => None,
         },
-        None => match open_jsx_component_type {
-            Some(JSXComponentType::HowToOpening) => {
-                match form_how_to_component_opening_line(line) {
-                    Ok((_, (line, line_type, level))) => {
-                        if !line.is_empty() {
-                            Some((line, line_type, level))
-                        } else {
-                            None
-                        }
-                    }
-                    Err(_) => Some((line.to_string(), LineType::HowToOpening, 0)),
+        None => None,
+    }
+}
+
+fn parse_open_jsx_block(
+    line: &str,
+    open_jsx_component_type: Option<&JSXComponentType>,
+) -> Option<(String, LineType, usize)> {
+    match open_jsx_component_type {
+        Some(JSXComponentType::HowToOpening) => match form_how_to_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
                 }
             }
-            Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
-                Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
-                        None
-                    }
+            Err(_) => Some((line.to_string(), LineType::HowToOpening, 0)),
+        },
+        Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
                 }
-                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-            },
-            Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
-                Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
-                        None
-                    }
+            }
+            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+        },
+        Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
                 }
-                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-            },
-            Some(JSXComponentType::FencedCodeBlock) => match alt((
-                form_fenced_code_block_last_line,
-                form_fenced_code_block_import_line,
-                form_fenced_code_block_script_line,
-                form_fenced_code_block_script_open_line,
+            }
+            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
+        },
+        Some(JSXComponentType::FencedCodeBlock) => match alt((
+            form_fenced_code_block_last_line,
+            form_fenced_code_block_import_line,
+            form_fenced_code_block_script_line,
+            form_fenced_code_block_script_open_line,
+        ))(line)
+        {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
+        },
+        Some(JSXComponentType::HowTo) => match alt((
+            form_fenced_code_block_first_line,
+            form_video_component_first_line,
+            form_how_to_component_last_line,
+        ))(line)
+        {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    Some((line, line_type, level))
+                } else {
+                    None
+                }
+            }
+            Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
+        },
+        Some(_) => {
+            match alt((
+                form_code_fragment_component_last_line,
+                form_poll_component_last_line,
+                form_video_component_last_line,
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
@@ -1148,40 +1184,22 @@ fn parse_mdx_line(
                         None
                     }
                 }
-                Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
-            },
-            Some(JSXComponentType::HowTo) => match alt((
-                form_fenced_code_block_first_line,
-                form_video_component_first_line,
-                form_how_to_component_last_line,
-            ))(line)
-            {
-                Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
-            },
-            Some(_) => {
-                match alt((
-                    form_code_fragment_component_last_line,
-                    form_poll_component_last_line,
-                    form_video_component_last_line,
-                ))(line)
-                {
-                    Ok((_, (line, line_type, level))) => {
-                        if !line.is_empty() {
-                            Some((line, line_type, level))
-                        } else {
-                            None
-                        }
-                    }
-                    Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-                }
+                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
             }
+        }
+        None => None,
+    }
+}
+
+fn parse_mdx_line(
+    line: &str,
+    open_html_block_elements: Option<&HTMLBlockElementType>,
+    open_jsx_components: Option<&JSXComponentType>,
+) -> Option<(String, LineType, usize)> {
+    match parse_open_html_block(line, open_html_block_elements) {
+        Some(value) => Some(value),
+        None => match parse_open_jsx_block(line, open_jsx_components) {
+            Some(value) => Some(value),
             None => {
                 match alt((
                     form_code_fragment_component_first_line,
