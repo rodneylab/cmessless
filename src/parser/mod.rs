@@ -357,10 +357,10 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
 }
 
 fn form_code_span_line(line: &str) -> IResult<&str, String> {
-    let (_, (initial_segment, bold_segment, final_segment)) = segment_code_span_line(line)?;
+    let (_, (initial_segment, code_segment, final_segment)) = segment_code_span_line(line)?;
     Ok((
         final_segment,
-        format!("{initial_segment}<InlineCodeFragment code={{`{bold_segment}`}} />"),
+        format!("{initial_segment}<InlineCodeFragment code={{`{code_segment}`}} />"),
     ))
 }
 
@@ -876,10 +876,16 @@ fn form_emphasis_line(line: &str) -> IResult<&str, String> {
 
 fn form_strong_emphasis_line(line: &str) -> IResult<&str, String> {
     let (_, (initial_segment, bold_segment, final_segment)) = segment_strong_emphasis_line(line)?;
-    Ok((
-        final_segment,
-        format!("{initial_segment}<strong>{bold_segment}</strong>"),
-    ))
+    match form_code_span_line(bold_segment) {
+        Ok((_, code_segment)) => Ok((
+            final_segment,
+            format!("{initial_segment}<strong>{code_segment}</strong>"),
+        )),
+        Err(_) => Ok((
+            final_segment,
+            format!("{initial_segment}<strong>{bold_segment}</strong>"),
+        )),
+    }
 }
 
 fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
