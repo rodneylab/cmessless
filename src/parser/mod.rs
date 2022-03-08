@@ -1152,6 +1152,7 @@ fn parse_mdx_line(
             },
             Some(JSXComponentType::HowTo) => match alt((
                 form_fenced_code_block_first_line,
+                form_video_component_first_line,
                 form_how_to_component_last_line,
             ))(line)
             {
