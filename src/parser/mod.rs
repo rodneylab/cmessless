@@ -32,6 +32,7 @@ type ParsedFencedCodeBlockMeta<'a> = (
 
 #[derive(PartialEq)]
 enum HTMLBlockElementType {
+    Comment,
     Figure,
     TableBody,
     TableHead,
@@ -79,6 +80,8 @@ enum LineType {
     FrontmatterDelimiter,
     JSXComponent,
     Heading,
+    HTMLBlockLevelComment,
+    HTMLBlockLevelCommentOpen,
     HTMLFigureBlockOpen,
     HTMLFigureBlock,
     HTMLTableBodyOpen,
@@ -423,6 +426,14 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
 
 fn parse_fenced_code_block_last_line(line: &str) -> IResult<&str, &str> {
     tag("```")(line)
+}
+
+fn parse_html_block_level_comment_first_line(line: &str) -> IResult<&str, &str> {
+    tag("<!--")(line)
+}
+
+fn parse_html_block_level_comment_last_line(line: &str) -> IResult<&str, &str> {
+    terminated(take_until("-->"), tag("-->"))(line)
 }
 
 fn parse_jsx_component_first_line<'a>(
@@ -898,6 +909,38 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     ))
 }
 
+fn form_html_block_level_comment_first_line(
+    line: &str,
+) -> IResult<&str, (String, LineType, usize)> {
+    parse_html_block_level_comment_first_line(line)?;
+    Ok((
+        "",
+        (
+            line.trim_end().to_string(),
+            LineType::HTMLBlockLevelCommentOpen,
+            0,
+        ),
+    ))
+}
+
+fn form_html_block_level_comment_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    match parse_html_block_level_comment_last_line(line) {
+        Ok((after_comment, end_of_comment)) => {
+            let (_, after_comment) = parse_inline_wrap_text(after_comment)?;
+            let markup = format!("{end_of_comment}-->{}", after_comment.trim_end());
+            Ok(("", (markup, LineType::HTMLBlockLevelComment, 0)))
+        }
+        Err(_) => Ok((
+            "",
+            (
+                line.trim_end().to_string(),
+                LineType::HTMLBlockLevelCommentOpen,
+                0,
+            ),
+        )),
+    }
+}
+
 fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (list_text, indentation) = parse_ordered_list_text(line)?;
     let (_, parsed_list_text) = parse_inline_wrap_text(list_text)?;
@@ -1052,6 +1095,12 @@ fn parse_open_html_block(
             Ok((_, value)) => Some(value),
             Err(_) => None,
         },
+        Some(HTMLBlockElementType::Comment) => {
+            match form_html_block_level_comment_last_line(line) {
+                Ok((_, value)) => Some(value),
+                Err(_) => None,
+            }
+        }
         None => None,
     }
 }
@@ -1153,6 +1202,7 @@ fn parse_mdx_line(
                     form_code_fragment_component_first_line,
                     form_fenced_code_block_first_line,
                     form_how_to_component_first_line,
+                    form_html_block_level_comment_first_line,
                     form_html_block_element_first_line,
                     form_table_head_first_line,
                     form_image_component,
@@ -1332,6 +1382,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     present_jsx_component_types.insert(JSXComponentType::Tweet);
                     tokens.push(line);
                 }
+                LineType::HTMLBlockLevelComment => {
+                    open_html_block_element_stack.pop();
+                    tokens.push(line);
+                }
                 LineType::HTMLFigureBlock => {
                     open_html_block_element_stack.pop();
                     tokens.push(line);
@@ -1398,6 +1452,13 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 LineType::VideoOpening => {
                     if open_jsx_component_type.peek() != Some(&JSXComponentType::VideoOpening) {
                         open_jsx_component_type.push(JSXComponentType::VideoOpening);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HTMLBlockLevelCommentOpen => {
+                    if open_html_block_element_stack.peek() != Some(&HTMLBlockElementType::Comment)
+                    {
+                        open_html_block_element_stack.push(HTMLBlockElementType::Comment);
                     }
                     tokens.push(line);
                 }

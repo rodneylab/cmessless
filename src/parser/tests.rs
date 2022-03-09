@@ -1,12 +1,13 @@
 use crate::parser::{
     discard_leading_whitespace, escape_code, form_code_fragment_component_first_line,
     form_code_span_line, form_fenced_code_block_first_line, form_html_anchor_element_line,
+    form_html_block_level_comment_first_line, form_html_block_level_comment_last_line,
     form_inline_wrap_text, form_jsx_component_first_line, form_ordered_list_line,
     form_table_body_last_line, form_table_body_row, form_table_head_first_line,
     form_table_head_last_line, form_table_head_row, form_table_header_row, parse_closing_html_tag,
     parse_fenced_code_block_first_line, parse_heading_text, parse_href_scheme,
-    parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
-    parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
+    parse_html_block_level_comment_last_line, parse_html_tag_attribute, parse_html_tag_attributes,
+    parse_html_tag_content, parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
     parse_opening_html_tag_end, parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
     parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
@@ -168,6 +169,64 @@ pub fn test_form_code_span_line() {
             form_code_span_line(mdx_line),
             Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
         );
+}
+
+#[test]
+pub fn test_form_html_block_level_comment_first_line() {
+    let mdx_line = "<!-- this should do so and so";
+    assert_eq!(
+        form_html_block_level_comment_first_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("<!-- this should do so and so"),
+                LineType::HTMLBlockLevelCommentOpen,
+                0
+            )
+        ))
+    );
+}
+
+#[test]
+pub fn test_form_html_block_level_comment_last_line() {
+    let mdx_line = "this comment is not over yet";
+    assert_eq!(
+        form_html_block_level_comment_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("this comment is not over yet"),
+                LineType::HTMLBlockLevelCommentOpen,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "just saying! -->  ";
+    assert_eq!(
+        form_html_block_level_comment_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("just saying! -->"),
+                LineType::HTMLBlockLevelComment,
+                0
+            )
+        ))
+    );
+
+    let mdx_line = "just saying! -->  <p>The problem with";
+    assert_eq!(
+        form_html_block_level_comment_last_line(mdx_line),
+        Ok((
+            "",
+            (
+                String::from("just saying! -->  <p>The problem with"),
+                LineType::HTMLBlockLevelComment,
+                0
+            )
+        ))
+    );
 }
 
 #[test]
@@ -483,6 +542,15 @@ pub fn test_parse_href_scheme() {
     assert_eq!(
         parse_href_scheme(href),
         Err(Err::Error(Error::new(href, ErrorKind::Tag)))
+    );
+}
+
+#[test]
+pub fn test_parse_html_block_level_comment_last_line() {
+    let mdx_line = "just saying! -->  <p>The problem with";
+    assert_eq!(
+        parse_html_block_level_comment_last_line(mdx_line),
+        Ok(("  <p>The problem with", "just saying! "))
     );
 }
 
