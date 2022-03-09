@@ -33,6 +33,7 @@ type ParsedFencedCodeBlockMeta<'a> = (
 #[derive(PartialEq)]
 enum HTMLBlockElementType {
     Comment,
+    DescriptionList,
     Figure,
     TableBody,
     TableHead,
@@ -82,6 +83,8 @@ enum LineType {
     Heading,
     HTMLBlockLevelComment,
     HTMLBlockLevelCommentOpen,
+    HTMLDescriptionList,
+    HTMLDescriptionListOpen,
     HTMLFigureBlockOpen,
     HTMLFigureBlock,
     HTMLTableBodyOpen,
@@ -500,6 +503,10 @@ fn parse_table_line(line: &str) -> IResult<&str, Vec<&str>> {
 fn form_html_block_element_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_remaining_line, (tag_name, _tag_attributes, _tag_type)) = parse_opening_html_tag(line)?;
     match tag_name {
+        "dl" => Ok((
+            "",
+            (String::from(line), LineType::HTMLDescriptionListOpen, 0),
+        )),
         "figure" => Ok(("", (String::from(line), LineType::HTMLFigureBlockOpen, 0))),
         _ => panic!("[ ERROR ] Unrecognised HTML block element: {tag_name}"),
     }
@@ -508,8 +515,9 @@ fn form_html_block_element_first_line(line: &str) -> IResult<&str, (String, Line
 fn form_html_block_element_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_remaining_line, (tag_name, _tag_attributes, _tag_type)) = parse_closing_html_tag(line)?;
     match tag_name {
+        "dl" => Ok(("", (String::from(line), LineType::HTMLDescriptionList, 0))),
         "figure" => Ok(("", (String::from(line), LineType::HTMLFigureBlock, 0))),
-        _ => Ok(("", (String::from(line), LineType::HTMLFigureBlockOpen, 0))),
+        _ => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
     }
 }
 
@@ -1088,6 +1096,18 @@ fn parse_open_html_block(
             }
             Err(_) => Some((line.to_string(), LineType::HTMLFigureBlockOpen, 0)),
         },
+        Some(HTMLBlockElementType::DescriptionList) => {
+            match form_html_block_element_last_line(line) {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some((line.to_string(), LineType::HTMLDescriptionListOpen, 0)),
+            }
+        }
         Some(HTMLBlockElementType::TableBody) => match form_table_body_last_line(line) {
             Ok((_, value)) => Some(value),
             Err(_) => None,
@@ -1387,6 +1407,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     open_html_block_element_stack.pop();
                     tokens.push(line);
                 }
+                LineType::HTMLDescriptionList => {
+                    open_html_block_element_stack.pop();
+                    tokens.push(line);
+                }
                 LineType::HTMLFigureBlock => {
                     open_html_block_element_stack.pop();
                     tokens.push(line);
@@ -1464,6 +1488,14 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     if open_html_block_element_stack.peek() != Some(&HTMLBlockElementType::Comment)
                     {
                         open_html_block_element_stack.push(HTMLBlockElementType::Comment);
+                    }
+                    tokens.push(line);
+                }
+                LineType::HTMLDescriptionListOpen => {
+                    if open_html_block_element_stack.peek()
+                        != Some(&HTMLBlockElementType::DescriptionList)
+                    {
+                        open_html_block_element_stack.push(HTMLBlockElementType::DescriptionList);
                     }
                     tokens.push(line);
                 }
