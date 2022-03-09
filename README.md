@@ -11,4 +11,11 @@
 
 Basic MDX parser written in Rust.
 
+- uses a parser combinator for improved parsing performance: outputs parsed output in a dozen milliseconds for input mdx file of~25 KB
+- watch mode to update Astro output as you save markdown,
+- escapes code in inline fragments and fenced code blocks.
+
+
+⛔️ **full Markdown spec not yet implemented!**
+
 Credit to tutorial by Jesse Lawson for initial inspiration: [https://jesselawson.org/rust/getting-started-with-rust-by-building-a-tiny-markdown-compiler/](https://jesselawson.org/rust/getting-started-with-rust-by-building-a-tiny-markdown-compiler/)
