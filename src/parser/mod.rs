@@ -1449,7 +1449,11 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     }
 
     let mut outfile =
-        File::create(output_path).expect("[ ERROR ] Was not able to create the output file!");
+        // File::create(output_path).expect("[ ERROR ] Was not able to create the output file!");
+        match File::create(output_path) {
+            Ok(value) => value,
+            Err(_) => panic!("[ ERROR ] Was not able to create the output file: {:?}!", output_path)
+        };
 
     for line in &astro_frontmatter {
         outfile
