@@ -1,12 +1,10 @@
 use crate::parser::{
-    discard_leading_whitespace, form_code_fragment_component_first_line, form_code_span_line,
-    form_fenced_code_block_first_line, form_fenced_code_block_import_line,
-    form_fenced_code_block_script_line, form_html_anchor_element_line, form_inline_wrap_text,
-    form_jsx_component_first_line, form_ordered_list_line, form_table_body_last_line,
-    form_table_body_row, form_table_head_first_line, form_table_head_last_line,
-    form_table_head_row, form_table_header_row, parse_closing_html_tag,
-    parse_fenced_code_block_first_line, parse_fenced_code_block_import_line,
-    parse_fenced_code_block_script_line, parse_heading_text, parse_href_scheme,
+    discard_leading_whitespace, escape_code, form_code_fragment_component_first_line,
+    form_code_span_line, form_fenced_code_block_first_line, form_html_anchor_element_line,
+    form_inline_wrap_text, form_jsx_component_first_line, form_ordered_list_line,
+    form_table_body_last_line, form_table_body_row, form_table_head_first_line,
+    form_table_head_last_line, form_table_head_row, form_table_header_row, parse_closing_html_tag,
+    parse_fenced_code_block_first_line, parse_heading_text, parse_href_scheme,
     parse_html_tag_attribute, parse_html_tag_attributes, parse_html_tag_content,
     parse_inline_wrap_segment, parse_inline_wrap_text, parse_jsx_component,
     parse_jsx_component_first_line, parse_mdx_line, parse_opening_html_tag,
@@ -32,11 +30,14 @@ pub fn test_discard_leading_whitespace() {
         );
 }
 
-// #[test]
-// pub fn test_escape_code() {
-//     let mdx_line = "`${variable}`";
-//     assert_eq!(escape_code(mdx_line), "\\u0060${variable}\\u0060");
-// }
+#[test]
+pub fn test_escape_code() {
+    let mdx_line = "`${variable}`";
+    assert_eq!(
+        escape_code(mdx_line),
+        "\\u0060$\\u007Bvariable\\u007D\\u0060"
+    );
+}
 
 #[test]
 pub fn test_form_code_fragment_component_first_line() {
@@ -88,7 +89,7 @@ pub fn test_form_fenced_code_block_first_line() {
         Ok((
             "",
             (
-                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  code={`\n<!--"),
+                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  code={`"),
                 LineType::FencedCodeBlockOpen,
                 0
             )
@@ -101,7 +102,7 @@ pub fn test_form_fenced_code_block_first_line() {
         Ok((
             "",
             (
-                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  code={`\n<!--"),
+                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  code={`"),
                 LineType::FencedCodeBlockOpen,
                 0
             )
@@ -114,39 +115,7 @@ pub fn test_form_fenced_code_block_first_line() {
         Ok((
             "",
             (
-                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  collapse\n  code={`\n<!--"),
-                LineType::FencedCodeBlockOpen,
-                0
-            )
-        ))
-    );
-}
-
-#[test]
-pub fn test_form_fenced_code_block_import_line() {
-    let mdx_line = "  import Component from './Component.jsx";
-    assert_eq!(
-        form_fenced_code_block_import_line(mdx_line),
-        Ok((
-            "",
-            (
-                String::from("  //astro-ignore import Component from './Component.jsx"),
-                LineType::FencedCodeBlockOpen,
-                0
-            )
-        ))
-    );
-}
-
-#[test]
-pub fn test_form_fenced_code_block_script_line() {
-    let mdx_line = "  <script>";
-    assert_eq!(
-        form_fenced_code_block_script_line(mdx_line),
-        Ok((
-            "",
-            (
-                String::from("  <script-astro>"),
+                String::from("<CodeFragment\n  client:visible\n  set:html\n  language=\"plaintext\"\n  firstLine={2}\n  highlightLines={`{5,7}`}\n  title=\".env\"\n  collapse\n  code={`"),
                 LineType::FencedCodeBlockOpen,
                 0
             )
@@ -197,7 +166,7 @@ pub fn test_form_code_span_line() {
     let mdx_line = "NewTech `console.log(\"made it here\")` first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
             form_code_span_line(mdx_line),
-            Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <InlineCodeFragment code={`console.log(\"made it here\")`} />")))
+            Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
         );
 }
 
@@ -499,24 +468,6 @@ pub fn test_parse_fenced_code_block_first_line() {
                 Some(true)
             )
         ))
-    );
-}
-
-#[test]
-pub fn test_parse_fenced_code_block_import_line() {
-    let mdx_line = "  import Component from './Component.jsx";
-    assert_eq!(
-        parse_fenced_code_block_import_line(mdx_line),
-        Ok((" Component from './Component.jsx", ("  ", "import")))
-    );
-}
-
-#[test]
-pub fn test_parse_fenced_code_block_script_line() {
-    let mdx_line = "  <script>";
-    assert_eq!(
-        parse_fenced_code_block_script_line(mdx_line),
-        Ok(("", "  "))
     );
 }
 

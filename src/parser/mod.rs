@@ -119,6 +119,14 @@ fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
     preceded(multispace0, rest)(line)
 }
 
+fn escape_code(line: &str) -> String {
+    line.replace('<', "\\u003C")
+        .replace('>', "\\u003E")
+        .replace('`', "\\u0060")
+        .replace('{', "\\u007B")
+        .replace('}', "\\u007D")
+}
+
 fn remove_html_tags(line: &str) -> IResult<&str, &str> {
     let (remaining_line, initial_segment) = take_until("<")(line)?;
     let (final_segment, _) = parse_self_closing_html_tag(remaining_line)?;
@@ -360,7 +368,10 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     let (_, (initial_segment, code_segment, final_segment)) = segment_code_span_line(line)?;
     Ok((
         final_segment,
-        format!("{initial_segment}<InlineCodeFragment code={{`{code_segment}`}} />"),
+        format!(
+            "{initial_segment}<code>{}</code>",
+            escape_code(code_segment)
+        ),
     ))
 }
 
@@ -408,24 +419,6 @@ fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedC
             collapse_option,
         ),
     ))
-}
-
-fn parse_fenced_code_block_import_line(line: &str) -> IResult<&str, (&str, &str)> {
-    let delimiter = "import";
-    let (after_tag, (before_tag, tag)) = pair(multispace0, tag(delimiter))(line)?;
-    Ok((after_tag, (before_tag, tag)))
-}
-
-fn parse_fenced_code_block_script_line(line: &str) -> IResult<&str, &str> {
-    let delimiter = "<script>";
-    let (after_tag, (before_tag, _)) = pair(take_until(delimiter), tag(delimiter))(line)?;
-    Ok((after_tag, before_tag))
-}
-
-fn parse_fenced_code_block_script_open_line(line: &str) -> IResult<&str, &str> {
-    let delimiter = "<script ";
-    let (after_tag, (before_tag, _)) = pair(take_until(delimiter), tag(delimiter))(line)?;
-    Ok((after_tag, before_tag))
 }
 
 fn parse_fenced_code_block_last_line(line: &str) -> IResult<&str, &str> {
@@ -551,7 +544,7 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
     if let Some(true) = collapse_option {
         markup.push_str("\n  collapse");
     };
-    markup.push_str("\n  code={`\n<!--");
+    markup.push_str("\n  code={`");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
@@ -768,48 +761,9 @@ fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineT
     Ok(("", (line.to_string(), line_type, 0)))
 }
 
-fn form_fenced_code_block_import_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (after_tag, (before_tag, tag)) = parse_fenced_code_block_import_line(line)?;
-    Ok((
-        "",
-        (
-            format!("{before_tag}//astro-ignore {tag}{after_tag}"),
-            LineType::FencedCodeBlockOpen,
-            0,
-        ),
-    ))
-}
-
-fn form_fenced_code_block_script_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (after_tag, before_tag) = parse_fenced_code_block_script_line(line)?;
-    Ok((
-        "",
-        (
-            format!("{before_tag}<script-astro>{after_tag}"),
-            LineType::FencedCodeBlockOpen,
-            0,
-        ),
-    ))
-}
-
-fn form_fenced_code_block_script_open_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (after_tag, before_tag) = parse_fenced_code_block_script_open_line(line)?;
-    Ok((
-        "",
-        (
-            format!("{before_tag}<script-astro {after_tag}"),
-            LineType::FencedCodeBlockOpen,
-            0,
-        ),
-    ))
-}
-
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
-    Ok((
-        "",
-        (String::from("-->\n  `} />"), LineType::FencedCodeBlock, 0),
-    ))
+    Ok(("", (String::from("  `} />"), LineType::FencedCodeBlock, 0)))
 }
 
 fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -987,10 +941,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
     let mut define_slug = false;
     let mut image_data_imports: Vec<String> = Vec::new();
 
-    result.push(String::from(
-        "---
-import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
-    ));
+    result.push(String::from("---"));
     if components.contains(&JSXComponentType::CodeFragment) {
         result.push(String::from(
             "import CodeFragment from '$components/CodeFragment.tsx';",
@@ -1140,22 +1091,18 @@ fn parse_open_jsx_block(
             }
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
         },
-        Some(JSXComponentType::FencedCodeBlock) => match alt((
-            form_fenced_code_block_last_line,
-            form_fenced_code_block_import_line,
-            form_fenced_code_block_script_line,
-            form_fenced_code_block_script_open_line,
-        ))(line)
-        {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
+        Some(JSXComponentType::FencedCodeBlock) => {
+            match alt((form_fenced_code_block_last_line,))(line) {
+                Ok((_, (line, line_type, level))) => {
+                    if !line.is_empty() {
+                        Some((line, line_type, level))
+                    } else {
+                        None
+                    }
                 }
+                Err(_) => Some((escape_code(line), LineType::FencedCodeBlockOpen, 0)),
             }
-            Err(_) => Some((line.to_string(), LineType::FencedCodeBlockOpen, 0)),
-        },
+        }
         Some(JSXComponentType::HowTo) => match alt((
             form_fenced_code_block_first_line,
             form_video_component_first_line,
