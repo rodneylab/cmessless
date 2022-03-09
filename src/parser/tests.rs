@@ -32,6 +32,12 @@ pub fn test_discard_leading_whitespace() {
         );
 }
 
+// #[test]
+// pub fn test_escape_code() {
+//     let mdx_line = "`${variable}`";
+//     assert_eq!(escape_code(mdx_line), "\\u0060${variable}\\u0060");
+// }
+
 #[test]
 pub fn test_form_code_fragment_component_first_line() {
     let mdx_line = "<CodeFragment";
@@ -279,9 +285,9 @@ pub fn test_form_table_body_last_line() {
             (
                 String::from(
                     "    <tr>
-      <td>1 January </td>
-      <td>Central London </td>
-      <td>Sunny </td>
+      <td>1 January</td>
+      <td>Central London</td>
+      <td>Sunny</td>
     </tr>"
                 ),
                 LineType::HTMLTableBodyOpen,
@@ -314,9 +320,9 @@ pub fn test_form_table_body_row() {
             (
                 String::from(
                     "    <tr>
-      <td>1 January </td>
-      <td>Central London </td>
-      <td>Sunny </td>
+      <td>1 January</td>
+      <td>Central London</td>
+      <td>Sunny</td>
     </tr>"
                 ),
                 LineType::HTMLTableBodyOpen,

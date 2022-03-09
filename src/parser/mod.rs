@@ -660,7 +660,7 @@ fn form_table_body_row(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let mut markup = String::from("    <tr>");
     for cell in cells {
         markup.push_str("\n      <td>");
-        markup.push_str(cell);
+        markup.push_str(cell.trim_end());
         markup.push_str("</td>");
     }
     markup.push_str("\n    </tr>");
