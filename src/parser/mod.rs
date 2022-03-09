@@ -762,14 +762,15 @@ fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, LineTy
 }
 
 fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (_, line_type) = alt((
-        map(terminated(take_until("/>"), tag("/>")), |_| LineType::Video),
-        map(terminated(take_until(">"), tag(">")), |_| {
-            LineType::VideoOpen
-        }),
-        map(rest, |_| LineType::VideoOpening),
-    ))(line)?;
-    Ok(("", (line.to_string(), line_type, 0)))
+    let (remaining_line, (markup, tag_type, indentation)) = form_jsx_component_opening_line(line)?;
+    match tag_type {
+        HTMLTagType::Opening => Ok((remaining_line, (markup, LineType::VideoOpen, indentation))),
+        HTMLTagType::SelfClosing => Ok((remaining_line, (markup, LineType::Video, indentation))),
+        _ => Ok((
+            "",
+            (String::from(line), LineType::VideoOpening, indentation),
+        )),
+    }
 }
 
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -1444,7 +1445,11 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     tokens.push(line);
                 }
                 LineType::VideoOpen => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::Video) {
+                    let current_open_jsx_component = open_jsx_component_type.peek();
+                    if current_open_jsx_component == Some(&JSXComponentType::VideoOpening) {
+                        open_jsx_component_type.pop();
+                        open_jsx_component_type.push(JSXComponentType::Video);
+                    } else if current_open_jsx_component != Some(&JSXComponentType::Video) {
                         open_jsx_component_type.push(JSXComponentType::Video);
                     }
                     tokens.push(line);
