@@ -384,7 +384,8 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     Ok((
         final_segment,
         format!(
-            "{initial_segment}<code>{}</code>",
+            // "{initial_segment}<code>{}</code>",
+            "{initial_segment}<InlineCodeFragment code={{`{}`}} />",
             escape_code(code_segment)
         ),
     ))
@@ -1022,7 +1023,8 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
         ));
     }
     result.push(String::from(
-        "import LinkIcon from '$components/Icons/Link.svelte';",
+        "import LinkIcon from '$components/Icons/Link.svelte';
+import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
     ));
     if components.contains(&JSXComponentType::Poll) {
         define_slug = true;

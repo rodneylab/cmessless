@@ -167,7 +167,8 @@ pub fn test_form_code_span_line() {
     let mdx_line = "NewTech `console.log(\"made it here\")` first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
             form_code_span_line(mdx_line),
-            Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
+            // Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <code>console.log(\"made it here\")</code>")))
+            Ok((" first set up to solve the common problem coming up for identifiers in computer science.",String::from("NewTech <InlineCodeFragment code={`console.log(\"made it here\")`} />")))
         );
 }
 
