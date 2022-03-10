@@ -940,12 +940,12 @@ fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
 fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (value, level) = parse_heading_text(line)?;
     let (_, parsed_text) = parse_inline_wrap_text(value)?;
+    let id = slugify_title(value);
     Ok((
         "",
         (
             format!(
-                "<h{level} id=\"{}\">{}</h{level}>",
-                slugify_title(value),
+                "<h{level} id=\"{id}\"><Heading client:visible id=\"{id}\" text=\"{}\"/></h{level}>",
                 format_heading(parsed_text)
             ),
             LineType::Heading,
@@ -1032,6 +1032,9 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
             "import CodeFragment from '$components/CodeFragment.tsx';",
         ));
     }
+    result.push(String::from(
+        "import Heading from '$components/BlogPost/Heading.svelte';",
+    ));
     if components.contains(&JSXComponentType::HowTo) {
         define_slug = true;
         result.push(String::from(
