@@ -945,7 +945,7 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
         "",
         (
             format!(
-                "<h{level} id=\"{id}\"><Heading client:visible id=\"{id}\" text=\"{}\"/></h{level}>",
+                "<h{level} id=\"{id}\"><Heading id=\"{id}\" text=\"{}\"/></h{level}>",
                 format_heading(parsed_text)
             ),
             LineType::Heading,
@@ -1033,7 +1033,7 @@ fn form_astro_frontmatter(components: &HashSet<JSXComponentType>, slug: &str) ->
         ));
     }
     result.push(String::from(
-        "import Heading from '$components/BlogPost/Heading.svelte';",
+        "import Heading from '$components/Heading.svelte';",
     ));
     if components.contains(&JSXComponentType::HowTo) {
         define_slug = true;
