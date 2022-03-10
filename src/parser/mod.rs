@@ -350,6 +350,7 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
         segment_anchor_element_no_attributes_line,
     ))(line)?;
     let (_, attributes_vector) = parse_html_tag_attributes(anchor_attributes_segment)?;
+    let (remaining_line, link_content) = take_until("</a>")(final_segment)?;
 
     let attributes_hash_map: HashMap<&str, &str> = attributes_vector.into_iter().collect();
     let href = attributes_hash_map
@@ -366,10 +367,15 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
             additional_attributes.push_str(" rel=\"nofollow noopener noreferrer\"");
         }
     }
+    let icon = if external_site {
+        "&nbsp;<LinkIcon />"
+    } else {
+        ""
+    };
 
     Ok((
-        final_segment,
-        format!("{initial_segment}<a {anchor_attributes_segment}{additional_attributes}>"),
+        remaining_line,
+        format!("{initial_segment}<a {anchor_attributes_segment}{additional_attributes}>{link_content}{icon}"),
     ))
 }
 
@@ -1015,6 +1021,9 @@ import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
             "import Image from '$components/BlogPost/Image.svelte';",
         ));
     }
+    result.push(String::from(
+        "import LinkIcon from '$components/Icons/Link.svelte';",
+    ));
     if components.contains(&JSXComponentType::Poll) {
         define_slug = true;
         result.push(String::from("import Poll from '$components/Poll.svelte';"));

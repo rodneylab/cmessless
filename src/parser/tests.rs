@@ -131,9 +131,9 @@ pub fn test_form_html_anchor_element_line() {
     assert_eq!(
             form_html_anchor_element_line(mdx_line),
             Ok((
-                "site</a>.",
+                "</a>.",
                 String::from(
-                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">"
+                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">site&nbsp;<LinkIcon />"
                 )
             ))
         );
@@ -142,7 +142,7 @@ pub fn test_form_html_anchor_element_line() {
     let mdx_line = "<a href=\"/home/contact-us\">site</a>.";
     assert_eq!(
         form_html_anchor_element_line(mdx_line),
-        Ok(("site</a>.", String::from("<a href=\"/home/contact-us\">")))
+        Ok(("</a>.", String::from("<a href=\"/home/contact-us\">site")))
     );
 }
 
