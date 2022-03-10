@@ -131,7 +131,8 @@ fn escape_code(line: &str) -> String {
         .replace('`', "\\u0060")
         .replace('{', "\\u007B")
         .replace('}', "\\u007D")
-        .replace("import.", "import\\u002E")
+        .replace("import.", "import..")
+        .replace("process.env", "process..env")
 }
 
 fn remove_html_tags(line: &str) -> IResult<&str, &str> {
