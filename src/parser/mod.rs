@@ -149,11 +149,12 @@ fn slugify_title(title: &str) -> String {
             slugify_title(final_value)
         ),
         Err(_) => {
-            let mut result = String::new();
+            let deunicoded_title = deunicode(title);
+            let mut result = String::with_capacity(deunicoded_title.len());
             let mut last_was_replaced = true;
             let remove_characters = "?`:[]()";
             let replace_characters = " /-"; // include '-' here to avoid "--" in result
-            for chars in deunicode(title).chars() {
+            for chars in deunicoded_title.chars() {
                 if replace_characters.contains(chars) {
                     if !last_was_replaced {
                         last_was_replaced = true;
