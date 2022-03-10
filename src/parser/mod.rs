@@ -14,6 +14,7 @@ use nom::{
     Err, IResult,
 };
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Write},
@@ -139,6 +140,30 @@ fn remove_html_tags(line: &str) -> IResult<&str, &str> {
     let (remaining_line, initial_segment) = take_until("<")(line)?;
     let (final_segment, _) = parse_self_closing_html_tag(remaining_line)?;
     Ok((final_segment, initial_segment))
+}
+
+fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
+    let heading = heading.into();
+    fn is_replace_character(c: char) -> bool {
+        c == '-'
+    }
+
+    let first = heading.find(is_replace_character);
+    if let Some(first) = first {
+        let mut result = String::from(&heading[0..first]);
+        result.reserve(heading.len() - first);
+        let rest = heading[first..].chars();
+
+        for c in rest {
+            match c {
+                '-' => result.push_str("&#x2011;"), // non-breaking hyphen
+                _ => result.push(c),
+            }
+        }
+        Cow::Owned(result)
+    } else {
+        heading
+    }
 }
 
 fn slugify_title(title: &str) -> String {
@@ -919,8 +944,9 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
         "",
         (
             format!(
-                "<h{level} id=\"{}\">{parsed_text}</h{level}>",
-                slugify_title(value)
+                "<h{level} id=\"{}\">{}</h{level}>",
+                slugify_title(value),
+                format_heading(parsed_text)
             ),
             LineType::Heading,
             level,
