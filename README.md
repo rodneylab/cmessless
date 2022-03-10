@@ -12,6 +12,7 @@
 Basic MDX parser written in Rust.
 
 - adds an id to each heading for easy linking,
+- reformats headings, replacing hyphens with non-breaking hyphens,
 - uses a parser combinator for improved parsing performance: outputs parsed output in a dozen milliseconds for input mdx file of ~25 KB
 - watch mode to update Astro output as you save markdown,
 - escapes code in inline fragments and fenced code blocks.
