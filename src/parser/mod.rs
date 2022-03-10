@@ -894,10 +894,10 @@ fn parse_inline_wrap_segment<'a>(
     separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
 }
 
-fn parse_ordered_list_text(line: &str) -> IResult<&str, usize> {
-    let (heading, indentation) =
-        terminated(many0_count(tag(" ")), preceded(digit1, tag(". ")))(line)?;
-    Ok((heading, indentation))
+fn parse_ordered_list_text(line: &str) -> IResult<&str, (usize, &str)> {
+    let (content_text, (indentation, start, _full_stop_tag)) =
+        tuple((many0_count(tag(" ")), digit1, tag(". ")))(line)?;
+    Ok((content_text.trim(), (indentation, start)))
 }
 
 fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
@@ -954,16 +954,13 @@ fn form_html_block_level_comment_last_line(line: &str) -> IResult<&str, (String,
 }
 
 fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (list_text, indentation) = parse_ordered_list_text(line)?;
+    let (list_text, (indentation, start)) = parse_ordered_list_text(line)?;
     let (_, parsed_list_text) = parse_inline_wrap_text(list_text)?;
-    Ok((
-        "",
-        (
-            format!("<li>{parsed_list_text}</li>"),
-            LineType::OrderedListItem,
-            indentation,
-        ),
-    ))
+    let markup = match start {
+        "1" => format!("<li>{parsed_list_text}</li>"),
+        _ => format!("</ol>\n<ol start=\"{start}\"><li>{parsed_list_text}</li>"),
+    };
+    Ok(("", (markup, LineType::OrderedListItem, indentation)))
 }
 
 fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {

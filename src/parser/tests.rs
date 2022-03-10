@@ -714,13 +714,13 @@ pub fn test_parse_ordered_list_text() {
     let list_line_mdx = "1. first of all  ";
     assert_eq!(
         parse_ordered_list_text(list_line_mdx),
-        Ok(("first of all  ", 0))
+        Ok(("first of all", (0, "1")))
     );
 
-    let list_line_mdx = "  1. first of all  ";
+    let list_line_mdx = "  3. third of all  ";
     assert_eq!(
         parse_ordered_list_text(list_line_mdx),
-        Ok(("first of all  ", 2))
+        Ok(("third of all", (2, "3")))
     );
 }
 
