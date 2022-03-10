@@ -177,7 +177,7 @@ fn slugify_title(title: &str) -> String {
             let deunicoded_title = deunicode(title);
             let mut result = String::with_capacity(deunicoded_title.len());
             let mut last_was_replaced = true;
-            let remove_characters = "?`:[]()";
+            let remove_characters = "?'`:[]()";
             let replace_characters = " /-"; // include '-' here to avoid "--" in result
             for chars in deunicoded_title.chars() {
                 if replace_characters.contains(chars) {
