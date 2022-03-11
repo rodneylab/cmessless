@@ -245,6 +245,10 @@ pub fn test_form_inline_wrap_text() {
         form_inline_wrap_text(mdx_line),
         Ok(("", (String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"), LineType::Paragraph, 0)))
     );
+
+    // add paragraph containing inline code fragment and emphasised text
+    let mdx_line = "To me `E=mc^2` rather than `F=ma` is **the** most important equation.";
+    assert_eq!(form_inline_wrap_text(mdx_line), Ok(("", (String::from("<p>To me <InlineCodeFragment code={`E=mc^2`} /> rather than <InlineCodeFragment code={`F=ma`} /> is <strong>the</strong> most important equation.</p>"), LineType::Paragraph, 0))) );
 }
 
 #[test]
@@ -690,6 +694,9 @@ pub fn test_parse_inline_wrap_text() {
 
     let mdx_line = "NewTech was first set up to *solve* the common problem coming up for identifiers in *computer* science.";
     assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("NewTech was first set up to <em>solve</em> the common problem coming up for identifiers in <em>computer</em> science."))));
+
+    let mdx_line = "To me `E=mc^2` rather than `F=ma` is **the** most important equation.";
+    assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("To me <InlineCodeFragment code={`E=mc^2`} /> rather than <InlineCodeFragment code={`F=ma`} /> is <strong>the</strong> most important equation."))));
 }
 
 #[test]

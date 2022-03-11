@@ -903,19 +903,27 @@ fn form_strong_emphasis_line(line: &str) -> IResult<&str, String> {
 }
 
 fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
-    let (initial_segment, final_segment): (String, &str) = match alt((
-        form_strong_emphasis_line,
-        form_emphasis_line,
-        form_code_span_line,
-        form_html_anchor_element_line,
-    ))(line)
-    {
-        Ok((value_1, value_2)) => (value_2, value_1),
-        Err(_) => return Ok(("", line.to_string())),
-    };
+    fn is_wrap_tag(c: char) -> bool {
+        c == '`' || c == '*' || c == '<'
+    }
 
-    let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
-    Ok(("", format!("{initial_segment}{final_final_segment}")))
+    let first_tag = line.find(is_wrap_tag);
+    if let Some(first_tag) = first_tag {
+        let parsed_result = match line.get(first_tag..(first_tag + 1)) {
+            Some("`") => form_code_span_line(line),
+            Some("<") => form_html_anchor_element_line(line),
+            Some("*") => alt((form_strong_emphasis_line, form_emphasis_line))(line),
+            _ => return Ok(("", line.to_string())),
+        };
+        let (initial_segment, final_segment) = match parsed_result {
+            Ok((value_1, value_2)) => (value_2, value_1),
+            Err(_) => return Ok(("", line.to_string())),
+        };
+        let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
+        Ok(("", format!("{initial_segment}{final_final_segment}")))
+    } else {
+        Ok(("", line.to_string()))
+    }
 }
 
 fn parse_heading_text(line: &str) -> IResult<&str, usize> {
