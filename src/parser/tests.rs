@@ -131,9 +131,9 @@ pub fn test_form_html_anchor_element_line() {
     assert_eq!(
             form_html_anchor_element_line(mdx_line),
             Ok((
-                "</a>.",
+                ".",
                 String::from(
-                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">site&nbsp;<LinkIcon />"
+                    "<a href=\"https://www.example.com\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">site&nbsp;<LinkIcon /></a>"
                 )
             ))
         );
@@ -142,7 +142,16 @@ pub fn test_form_html_anchor_element_line() {
     let mdx_line = "<a href=\"/home/contact-us\">site</a>.";
     assert_eq!(
         form_html_anchor_element_line(mdx_line),
-        Ok(("</a>.", String::from("<a href=\"/home/contact-us\">site")))
+        Ok((".", String::from("<a href=\"/home/contact-us\">site</a>")))
+    );
+
+    let mdx_line = "Go to <a href=\"www.example.com\">site</a> to learn more.";
+    assert_eq!(
+        form_html_anchor_element_line(mdx_line),
+        Ok((
+            " to learn more.",
+            String::from("Go to <a href=\"www.example.com\">site</a>")
+        ))
     );
 }
 
@@ -697,6 +706,14 @@ pub fn test_parse_inline_wrap_text() {
 
     let mdx_line = "To me `E=mc^2` rather than `F=ma` is **the** most important equation.";
     assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("To me <InlineCodeFragment code={`E=mc^2`} /> rather than <InlineCodeFragment code={`F=ma`} /> is <strong>the</strong> most important equation."))));
+
+    let mdx_line =
+        "On <a href=\"www.example.com\">our site</a>, you can see how `console.log()` works.";
+    assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("On <a href=\"www.example.com\">our site</a>, you can see how <InlineCodeFragment code={`console.log()`} /> works."))));
+
+    let mdx_line =
+        "See our <a href=\"www.example.com\">latest `console.log()` example</a> if you like.";
+    assert_eq!(parse_inline_wrap_text(mdx_line), Ok(("", String::from("See our <a href=\"www.example.com\">latest <InlineCodeFragment code={`console.log()`} /> example</a> if you like."))));
 }
 
 #[test]

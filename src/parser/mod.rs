@@ -403,11 +403,17 @@ fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
     } else {
         ""
     };
-
-    Ok((
+    let (remaining_line, (tag_name, _, _)) = parse_closing_html_tag(remaining_line)?;
+    match tag_name {
+        "a" => {
+            let (_, link_content) = parse_inline_wrap_text(link_content)?;
+            Ok((
         remaining_line,
-        format!("{initial_segment}<a {anchor_attributes_segment}{additional_attributes}>{link_content}{icon}"),
+        format!("{initial_segment}<a {anchor_attributes_segment}{additional_attributes}>{link_content}{icon}</a>"),
     ))
+        }
+        _ => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
+    }
 }
 
 fn form_code_span_line(line: &str) -> IResult<&str, String> {
