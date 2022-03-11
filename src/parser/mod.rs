@@ -915,7 +915,6 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 
     let first_tag = line.find(is_wrap_tag);
     if let Some(first_tag) = first_tag {
-        // let initial_initial_segment = line.get(first_tag..).unwrap();
         let parsed_result = match line.get(first_tag..(first_tag + 1)) {
             Some("`") => form_code_span_line(line.get(first_tag..).unwrap()),
             Some("<") => form_html_anchor_element_line(line.get(first_tag..).unwrap()),
