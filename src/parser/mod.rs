@@ -1392,7 +1392,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let mut current_indentation: usize = 0;
     let mut open_lists = Stack::new();
 
-    // used to keep a track of open Jblocks
+    // used to keep a track of open blocks
     let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
     let mut open_html_block_element_stack: Stack<HTMLBlockElementType> = Stack::new();
     let mut open_markdown_block_stack: Stack<MarkdownBlock> = Stack::new();
@@ -1409,7 +1409,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
         ) {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::OrderedList => {
-                    open_markdown_block_stack.push(MarkdownBlock::OrderedList);
+                    open_markdown_block_stack.pop();
                     open_lists.pop();
                     tokens.push(line);
                 }
