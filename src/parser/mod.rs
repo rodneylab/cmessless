@@ -915,10 +915,13 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 
     let first_tag = line.find(is_wrap_tag);
     if let Some(first_tag) = first_tag {
+        // let initial_initial_segment = line.get(first_tag..).unwrap();
         let parsed_result = match line.get(first_tag..(first_tag + 1)) {
-            Some("`") => form_code_span_line(line),
-            Some("<") => form_html_anchor_element_line(line),
-            Some("*") => alt((form_strong_emphasis_line, form_emphasis_line))(line),
+            Some("`") => form_code_span_line(line.get(first_tag..).unwrap()),
+            Some("<") => form_html_anchor_element_line(line.get(first_tag..).unwrap()),
+            Some("*") => {
+                alt((form_strong_emphasis_line, form_emphasis_line))(line.get(first_tag..).unwrap())
+            }
             _ => return Ok(("", line.to_string())),
         };
         let (initial_segment, final_segment) = match parsed_result {
@@ -926,7 +929,13 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
             Err(_) => return Ok(("", line.to_string())),
         };
         let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
-        Ok(("", format!("{initial_segment}{final_final_segment}")))
+        Ok((
+            "",
+            format!(
+                "{}{initial_segment}{final_final_segment}",
+                line.get(..first_tag).unwrap()
+            ),
+        ))
     } else {
         Ok(("", line.to_string()))
     }
