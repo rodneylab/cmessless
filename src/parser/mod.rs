@@ -95,7 +95,8 @@ enum LineType {
     HowToOpen,
     HowToOpening,
     Image,
-    OrderedListItem,
+    OrderedList,
+    OrderedListItemOpen,
     Paragraph,
     Poll,
     PollOpen,
@@ -112,6 +113,11 @@ enum LineType {
 enum ListType {
     Ordered,
     Unordered,
+}
+
+#[derive(Debug, PartialEq)]
+enum MarkdownBlock {
+    OrderedList,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -409,7 +415,6 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     Ok((
         final_segment,
         format!(
-            // "{initial_segment}<code>{}</code>",
             "{initial_segment}<InlineCodeFragment code={{`{}`}} />",
             escape_code(code_segment)
         ),
@@ -946,7 +951,7 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
         (
             format!(
                 "<h{level} id=\"{id}\"><Heading id=\"{id}\" text=\"{}\"/></h{level}>",
-                format_heading(parsed_text)
+                format_heading(parsed_text.trim_end())
             ),
             LineType::Heading,
             level,
@@ -986,14 +991,27 @@ fn form_html_block_level_comment_last_line(line: &str) -> IResult<&str, (String,
     }
 }
 
-fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+fn form_ordered_list_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (list_text, (indentation, start)) = parse_ordered_list_text(line)?;
     let (_, parsed_list_text) = parse_inline_wrap_text(list_text)?;
     let markup = match start {
-        "1" => format!("<li>{parsed_list_text}</li>"),
-        _ => format!("</ol>\n<ol start=\"{start}\"><li>{parsed_list_text}</li>"),
+        "1" => format!("<ol>\n  <li>{parsed_list_text}"),
+        _ => format!("<ol start=\"{start}\">\n  <li>{parsed_list_text}"),
     };
-    Ok(("", (markup, LineType::OrderedListItem, indentation)))
+    Ok(("", (markup, LineType::OrderedListItemOpen, indentation)))
+}
+
+fn form_ordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let (list_text, (indentation, _start)) = parse_ordered_list_text(line)?;
+    let (_, parsed_list_text) = parse_inline_wrap_text(list_text)?;
+    Ok((
+        "",
+        (
+            format!("  <li>{parsed_list_text}"),
+            LineType::OrderedListItemOpen,
+            indentation,
+        ),
+    ))
 }
 
 fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -1002,7 +1020,7 @@ fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usiz
     Ok((
         "",
         (
-            format!("<li>{parsed_list_text}</li>"),
+            format!("<li>\n  {parsed_list_text}\n</li>"),
             LineType::UnorderedListItem,
             indentation,
         ),
@@ -1118,6 +1136,26 @@ fn parse_frontmatter_line(line: &str) -> (Option<String>, LineType) {
     match parse_frontmatter_delimiter(line) {
         Ok((_frontmatter_line, _)) => (None, LineType::FrontmatterDelimiter),
         Err(_) => (Some(String::from(line)), LineType::Frontmatter),
+    }
+}
+
+fn parse_open_markdown_block(
+    line: &str,
+    open_markdown_block: Option<&MarkdownBlock>,
+) -> Option<(String, LineType, usize)> {
+    match open_markdown_block {
+        Some(MarkdownBlock::OrderedList) => match form_ordered_list_line(line) {
+            Ok((_, (line, line_type, level))) => {
+                if !line.is_empty() {
+                    let markup = format!("</li>{line}");
+                    Some((markup, line_type, level))
+                } else {
+                    Some((String::from("</ol>"), LineType::OrderedList, level))
+                }
+            }
+            Err(_) => None,
+        },
+        None => None,
     }
 }
 
@@ -1251,42 +1289,46 @@ fn parse_open_jsx_block(
 
 fn parse_mdx_line(
     line: &str,
+    open_markdown_block: Option<&MarkdownBlock>,
     open_html_block_elements: Option<&HTMLBlockElementType>,
     open_jsx_components: Option<&JSXComponentType>,
 ) -> Option<(String, LineType, usize)> {
-    match parse_open_html_block(line, open_html_block_elements) {
+    match parse_open_markdown_block(line, open_markdown_block) {
         Some(value) => Some(value),
-        None => match parse_open_jsx_block(line, open_jsx_components) {
+        None => match parse_open_html_block(line, open_html_block_elements) {
             Some(value) => Some(value),
-            None => {
-                match alt((
-                    form_code_fragment_component_first_line,
-                    form_fenced_code_block_first_line,
-                    form_how_to_component_first_line,
-                    form_html_block_level_comment_first_line,
-                    form_html_block_element_first_line,
-                    form_table_head_first_line,
-                    form_image_component,
-                    form_poll_component_first_line,
-                    form_questions_component,
-                    form_tweet_component,
-                    form_video_component_first_line,
-                    form_heading_line,
-                    form_ordered_list_line,
-                    form_unordered_list_line,
-                    form_inline_wrap_text,
-                ))(line)
-                {
-                    Ok((_, (line, line_type, level))) => {
-                        if !line.is_empty() {
-                            Some((line, line_type, level))
-                        } else {
-                            None
+            None => match parse_open_jsx_block(line, open_jsx_components) {
+                Some(value) => Some(value),
+                None => {
+                    match alt((
+                        form_code_fragment_component_first_line,
+                        form_fenced_code_block_first_line,
+                        form_how_to_component_first_line,
+                        form_html_block_level_comment_first_line,
+                        form_html_block_element_first_line,
+                        form_table_head_first_line,
+                        form_image_component,
+                        form_poll_component_first_line,
+                        form_questions_component,
+                        form_tweet_component,
+                        form_video_component_first_line,
+                        form_heading_line,
+                        form_ordered_list_first_line,
+                        form_unordered_list_line,
+                        form_inline_wrap_text,
+                    ))(line)
+                    {
+                        Ok((_, (line, line_type, level))) => {
+                            if !line.is_empty() {
+                                Some((line, line_type, level))
+                            } else {
+                                None
+                            }
                         }
+                        Err(_) => None,
                     }
-                    Err(_) => None,
                 }
-            }
+            },
         },
     }
 }
@@ -1350,11 +1392,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let mut current_indentation: usize = 0;
     let mut open_lists = Stack::new();
 
-    // used to keep a track of open JSX components
+    // used to keep a track of open Jblocks
     let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
-
-    // used to keep a track of open block HTML elements
     let mut open_html_block_element_stack: Stack<HTMLBlockElementType> = Stack::new();
+    let mut open_markdown_block_stack: Stack<MarkdownBlock> = Stack::new();
 
     let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
@@ -1362,18 +1403,28 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
         let line_content = line.unwrap();
         match parse_mdx_line(
             &line_content,
+            open_markdown_block_stack.peek(),
             open_html_block_element_stack.peek(),
             open_jsx_component_type.peek(),
         ) {
             Some((line, line_type, indentation)) => match line_type {
-                LineType::OrderedListItem => {
+                LineType::OrderedList => {
+                    open_markdown_block_stack.push(MarkdownBlock::OrderedList);
+                    open_lists.pop();
+                    tokens.push(line);
+                }
+                LineType::OrderedListItemOpen => {
+                    let open_markdown_block = open_markdown_block_stack.peek();
+                    if open_markdown_block != Some(&MarkdownBlock::OrderedList) {
+                        open_markdown_block_stack.push(MarkdownBlock::OrderedList);
+                    }
                     if open_lists.is_empty() {
                         open_lists.push(ListType::Ordered);
-                        tokens.push(format!("<ol>\n  {line}"));
+                        tokens.push(line);
                     } else if indentation > current_indentation {
                         open_lists.push(ListType::Ordered);
                         let list_item_indentation = " ".repeat(2 * open_lists.len());
-                        tokens.push(format!("<ol>\n{list_item_indentation}{line}"));
+                        tokens.push(format!("<ol>\n  {list_item_indentation}{line}"));
                     } else if indentation == current_indentation {
                         let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("{list_item_indentation}{line}"));
@@ -1383,6 +1434,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                         }
                         let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("</ol>\n{list_item_indentation}{line}"));
+                        open_markdown_block_stack.pop();
                     }
                     current_indentation = indentation
                 }
@@ -1400,6 +1452,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     } else {
                         while open_lists.pop() != Some(ListType::Unordered) {
                             tokens.push(String::from("</ol>"));
+                            open_markdown_block_stack.pop();
                         }
                         let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("</ul>\n{list_item_indentation}{line}"));
@@ -1568,7 +1621,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 while !open_lists.is_empty() {
                     match open_lists.pop() {
                         Some(ListType::Unordered) => tokens.push(String::from("</ul>")),
-                        Some(ListType::Ordered) => tokens.push(String::from("</ol>")),
+                        Some(ListType::Ordered) => {
+                            tokens.push(String::from("</ol>"));
+                            open_markdown_block_stack.pop();
+                        }
                         None => {}
                     }
                 }
@@ -1586,12 +1642,13 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
         println! {"\n"};
     }
 
-    let mut outfile =
-        // File::create(output_path).expect("[ ERROR ] Was not able to create the output file!");
-        match File::create(output_path) {
-            Ok(value) => value,
-            Err(_) => panic!("[ ERROR ] Was not able to create the output file: {:?}!", output_path)
-        };
+    let mut outfile = match File::create(output_path) {
+        Ok(value) => value,
+        Err(_) => panic!(
+            "[ ERROR ] Was not able to create the output file: {:?}!",
+            output_path
+        ),
+    };
 
     for line in &astro_frontmatter {
         outfile

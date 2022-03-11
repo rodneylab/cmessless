@@ -283,8 +283,8 @@ pub fn test_form_ordered_list_line() {
         Ok((
             "",
             (
-                String::from("<li>first things first</li>"),
-                LineType::OrderedListItem,
+                String::from("  <li>first things first"),
+                LineType::OrderedListItemOpen,
                 0
             )
         ))
@@ -296,8 +296,8 @@ pub fn test_form_ordered_list_line() {
         Ok((
             "",
             (
-                String::from("<li>first things <strong>before</strong> second things</li>"),
-                LineType::OrderedListItem,
+                String::from("  <li>first things <strong>before</strong> second things"),
+                LineType::OrderedListItemOpen,
                 0
             )
         ))
@@ -622,10 +622,10 @@ pub fn test_parse_jsx_component_first_line() {
 pub fn test_parse_mdx_line() {
     let mdx_line = "# Getting Started with NewTech  ";
     assert_eq!(
-        parse_mdx_line(mdx_line, None, None),
+        parse_mdx_line(mdx_line, None, None, None),
         Some((
             String::from(
-                "<h1 id=\"getting-started-with-newtech-\">Getting Started with NewTech  </h1>"
+                "<h1 id=\"getting-started-with-newtech-\"><Heading id=\"getting-started-with-newtech-\" text=\"Getting Started with NewTech\"/></h1>"
             ),
             LineType::Heading,
             1
@@ -634,10 +634,10 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "### 😕 What Does All This Mean?";
     assert_eq!(
-        parse_mdx_line(mdx_line, None, None),
+        parse_mdx_line(mdx_line, None, None, None),
         Some((
             String::from(
-                "<h3 id=\"confused-what-does-all-this-mean\">😕 What Does All This Mean?</h3>"
+                "<h3 id=\"confused-what-does-all-this-mean\"><Heading id=\"confused-what-does-all-this-mean\" text=\"😕 What Does All This Mean?\"/></h3>"
             ),
             LineType::Heading,
             3
@@ -646,7 +646,7 @@ pub fn test_parse_mdx_line() {
 
     let mdx_line = "NewTech was first set up to solve the common problem coming up for identifiers in computer science.";
     assert_eq!(
-            parse_mdx_line(mdx_line, None,None),
+            parse_mdx_line(mdx_line, None, None, None),
             Some((String::from("<p>NewTech was first set up to solve the common problem coming up for identifiers in computer science.</p>"),
                 LineType::Paragraph, 0))
         );
