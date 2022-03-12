@@ -482,7 +482,13 @@ pub fn test_format_heading_widows() {
     let title = "Introducing the zoo's new elephant";
     assert_eq!(
         format_heading_widows(title),
-        "Introducing the zoo's new elephant"
+        "Introducing the zoo\\u2019s new elephant"
+    );
+
+    let title = "\"Introducing\" the zoo's new elephant";
+    assert_eq!(
+        format_heading_widows(title),
+        "\\u201cIntroducing\\u201d the zoo\\u2018s new elephant"
     );
 }
 

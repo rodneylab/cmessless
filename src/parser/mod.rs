@@ -148,6 +148,9 @@ fn remove_html_tags(line: &str) -> IResult<&str, &str> {
     Ok((final_segment, initial_segment))
 }
 
+/* if the last word of the title is shorter than 6 characters, replaces the last space with a
+ * non-breaking space
+ */
 fn format_heading_widows(heading: &str) -> String {
     match heading.rsplit_once(' ') {
         Some((before_space, after_space)) => {
@@ -168,18 +171,54 @@ fn format_heading_widows(heading: &str) -> String {
 fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
     let heading = heading.into();
     fn is_replace_character(c: char) -> bool {
-        c == '-'
+        c == '-' || c == '\'' || c == '"'
     }
 
     let first = heading.find(is_replace_character);
     if let Some(first) = first {
-        let mut result = String::from(&heading[0..first]);
+        let (mut result, rest) = match first {
+            0 => match &heading[0..1] {
+                "\"" => (String::from("\\u201c"), heading[1..].chars()),
+                "'" => (String::from("\\u2018"), heading[1..].chars()),
+                _ => (String::from(&heading[0..first]), heading[first..].chars()),
+            },
+            _ => {
+                if &heading[(first - 1)..first] == " " {
+                    (
+                        String::from(&heading[0..(first - 1)]),
+                        heading[(first - 1)..].chars(),
+                    )
+                } else {
+                    (String::from(&heading[0..first]), heading[first..].chars())
+                }
+            }
+        };
         result.reserve(heading.len() - first);
-        let rest = heading[first..].chars();
 
+        let mut preceded_by_space = false;
         for c in rest {
             match c {
                 '-' => result.push_str("&#x2011;"), // non-breaking hyphen
+                ' ' => {
+                    preceded_by_space = true;
+                    result.push(c);
+                }
+                '\'' => {
+                    if preceded_by_space {
+                        preceded_by_space = false;
+                        result.push_str("\\u2018")
+                    } else {
+                        result.push_str("\\u2019")
+                    }
+                }
+                '"' => {
+                    if preceded_by_space {
+                        preceded_by_space = false;
+                        result.push_str("\\u201c")
+                    } else {
+                        result.push_str("\\u201d")
+                    }
+                }
                 _ => result.push(c),
             }
         }
