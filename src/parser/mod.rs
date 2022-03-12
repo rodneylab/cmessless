@@ -149,24 +149,19 @@ fn remove_html_tags(line: &str) -> IResult<&str, &str> {
 }
 
 fn format_heading_widows(heading: &str) -> String {
-    let widow_space_index = match heading.rsplit_once(' ') {
+    match heading.rsplit_once(' ') {
         Some((before_space, after_space)) => {
-            if after_space.len() < 5 {
-                Some(before_space.len())
+            if after_space.len() < 5 && heading.len() > 5 {
+                format!(
+                    "{}\\u00a0{}",
+                    format_heading(before_space),
+                    format_heading(after_space)
+                )
             } else {
-                None
+                format_heading(heading).to_string()
             }
         }
-        None => None,
-    };
-
-    match widow_space_index {
-        Some(value) => {
-            let heading_before_widow_space = format_heading(&heading[..value]);
-            let heading_after_widow_space = format_heading(&heading[(value + 1)..]);
-            format!("{heading_before_widow_space}\\u00a0{heading_after_widow_space}")
-        }
-        None => heading.to_string(),
+        None => format_heading(heading).to_string(),
     }
 }
 
