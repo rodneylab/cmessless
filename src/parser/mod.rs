@@ -151,7 +151,7 @@ fn remove_html_tags(line: &str) -> IResult<&str, &str> {
 fn format_heading_widows(heading: &str) -> String {
     match heading.rsplit_once(' ') {
         Some((before_space, after_space)) => {
-            if after_space.len() < 5 && heading.len() > 5 {
+            if after_space.len() < 5 {
                 format!(
                     "{}\\u00a0{}",
                     format_heading(before_space),
