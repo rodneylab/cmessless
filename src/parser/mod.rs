@@ -148,6 +148,18 @@ fn remove_html_tags(line: &str) -> IResult<&str, &str> {
     Ok((final_segment, initial_segment))
 }
 
+fn form_code_span_html_string(input: &str) -> String {
+    match segment_code_span_line(input) {
+        Ok((_, (initial_segment, code_segment, final_segment))) => {
+            format!(
+                "{initial_segment}<code>{code_segment}</code>{}",
+                form_code_span_html_string(final_segment)
+            )
+        }
+        Err(_) => String::from(input),
+    }
+}
+
 /* if the last word of the title is shorter than 6 characters, replaces the last space with a
  * non-breaking space
  */
@@ -1019,7 +1031,7 @@ fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
 
 fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (value, level) = parse_heading_text(line)?;
-    let (_, parsed_text) = parse_inline_wrap_text(value)?;
+    let parsed_text = form_code_span_html_string(value);
     let id = slugify_title(value);
     Ok((
         "",
