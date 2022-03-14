@@ -1187,28 +1187,46 @@ import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
             "import Video from '$components/Video.svelte';",
         ));
     }
-    if components.contains(&JSXComponentType::Image)
-        || components.contains(&JSXComponentType::Video)
-    {
-        result.push(format!("import imageData from '$generated/blog/{slug}';"));
-    }
-
-    if !image_data_imports.is_empty() {
-        let mut line = format!("\nconst {{ {}", image_data_imports[0]);
-        for import in &image_data_imports[1..] {
-            line.push_str(", ");
-            line.push_str(import.as_str());
-        }
-        line.push_str(" } = imageData;");
-        result.push(line);
-    }
     if define_slug {
-        result.push(format!("\nconst slug = '{slug}';"));
-    }
-    if components.contains(&JSXComponentType::Image) {
-        result.push(String::from(
-            "const imageProps = images.map((element, index) => ({ index, ...element, slug }));",
+        result.push("import website from '$configuration/website';".to_string());
+        result.push("import type { ResponsiveImage } from '$types/image';".to_string());
+        result.push("\nconst { nebulaUrl } = website;".to_string());
+        result.push(format!("const slug = '{slug}';"));
+        result.push(format!(
+            "async function getImageData() {{
+  try {{
+    const response = await fetch(`${{nebulaUrl}}/post/{slug}.json`);
+    const {{ data }} = await response.json();
+    return data
+  }} catch (error){{
+    console.error(`Error getting image data: {slug}`);
+  }}
+}}"
         ));
+        if components.contains(&JSXComponentType::Image)
+            && components.contains(&JSXComponentType::Video)
+        {
+            result.push(
+            "const { images, poster }: { images: ResponsiveImage[]; poster: string } = await getImageData();"
+                .to_string(),
+        );
+            result.push(
+                "const imageProps = images.map((element, index) => ({ index, ...element, slug }));"
+                    .to_string(),
+            );
+        } else if components.contains(&JSXComponentType::Image) {
+            result.push(
+                "const { images }: { images: ResponsiveImage[] } = await getImageData();"
+                    .to_string(),
+            );
+            result.push(
+                "const imageProps = images.map((element, index) => ({ index, ...element, slug }));"
+                    .to_string(),
+            );
+        } else if components.contains(&JSXComponentType::Video) {
+            result
+                .push("const {  poster }: {  poster: string } = await getImageData();".to_string());
+        }
     }
     result.push(String::from("---\n"));
     result
