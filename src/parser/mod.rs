@@ -45,6 +45,7 @@ enum JSXComponentType {
     CodeFragment,
     CodeFragmentOpening,
     FencedCodeBlock,
+    GatsbyNotMaintained,
     HowTo,
     HowToOpening,
     Image,
@@ -80,6 +81,7 @@ enum LineType {
     FencedCodeBlockOpen,
     Frontmatter,
     FrontmatterDelimiter,
+    GatsbyNotMaintained,
     JSXComponent,
     Heading,
     HTMLBlockLevelComment,
@@ -755,6 +757,19 @@ fn form_image_component(line: &str) -> IResult<&str, (String, LineType, usize)> 
     Ok(("", (format!("<Image{attributes}/>"), LineType::Image, 0)))
 }
 
+fn form_gatsby_not_maintained_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "GatsbyNotMaintained";
+    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("<GatsbyNotMaintained{attributes}/>"),
+            LineType::GatsbyNotMaintained,
+            0,
+        ),
+    ))
+}
+
 fn form_tweet_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let component_identifier = "Tweet";
     let (_, attributes) = parse_jsx_component(line, component_identifier)?;
@@ -1149,6 +1164,11 @@ import HowToStep from '$components/HowTo/HowToStep.svelte';
 import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
         ));
     }
+    if components.contains(&JSXComponentType::GatsbyNotMaintained) {
+        result.push(String::from(
+            "import GatsbyNotMaintained from '$components/BlogPost/GatsbyNotMaintained.svelte';",
+        ));
+    }
     if components.contains(&JSXComponentType::Image) {
         define_slug = true;
         image_data_imports.push(String::from("images"));
@@ -1415,6 +1435,7 @@ fn parse_mdx_line(
                         form_poll_component_first_line,
                         form_questions_component,
                         form_tweet_component,
+                        form_gatsby_not_maintained_component,
                         form_video_component_first_line,
                         form_heading_line,
                         form_ordered_list_first_line,
@@ -1594,6 +1615,10 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 }
                 LineType::Questions => {
                     present_jsx_component_types.insert(JSXComponentType::Questions);
+                    tokens.push(line);
+                }
+                LineType::GatsbyNotMaintained => {
+                    present_jsx_component_types.insert(JSXComponentType::GatsbyNotMaintained);
                     tokens.push(line);
                 }
                 LineType::Tweet => {
