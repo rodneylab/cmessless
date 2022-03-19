@@ -1189,7 +1189,6 @@ import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
     }
     if define_slug {
         result.push("import website from '$configuration/website';".to_string());
-        result.push("import type { ResponsiveImage } from '$types/image';".to_string());
         result.push("\nconst { nebulaUrl } = website;".to_string());
         result.push(format!("const slug = '{slug}';"));
         result.push(format!(
