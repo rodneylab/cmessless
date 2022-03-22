@@ -1217,7 +1217,7 @@ import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
     const response = await fetch(`${{nebulaUrl}}/post/{slug}.json`);
     const {{ data }} = await response.json();
     return data
-  }} catch (error){{
+  }} catch (error) {{
     console.error(`Error getting image data: {slug}`);
   }}
 }}"
