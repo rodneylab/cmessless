@@ -1,13 +1,25 @@
 #[cfg(test)]
 mod tests;
+use crate::parser::jsx::form_code_fragment_component_first_line;
+use crate::parser::jsx::form_gatsby_not_maintained_component;
+use crate::parser::jsx::form_how_to_component_first_line;
+use crate::parser::jsx::form_image_component;
+use crate::parser::jsx::form_poll_component_first_line;
+use crate::parser::jsx::form_questions_component;
+use crate::parser::jsx::parse_jsx_component_last_line;
+use crate::parser::jsx::parse_open_jsx_block;
+use crate::parser::jsx::{
+    form_tweet_component, form_video_component_first_line, JSXComponentRegister, JSXComponentType,
+};
 use crate::utility::stack::Stack;
+pub mod jsx;
 
 use deunicode::deunicode;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1},
-    combinator::{all_consuming, map, opt, peek, rest, value},
+    combinator::{opt, peek, rest, value},
     error::{Error, ErrorKind},
     multi::{many0, many0_count, many1, many1_count},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -41,39 +53,15 @@ enum HTMLBlockElementType {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-enum JSXComponentType {
-    CodeFragment,
-    CodeFragmentOpening,
-    FencedCodeBlock,
-    GatsbyNotMaintained,
-    HowTo,
-    HowToOpening,
-    Image,
-    Poll,
-    PollOpening,
-    Questions,
-    Tweet,
-    Video,
-    VideoOpening,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum HTMLTagType {
+pub enum HTMLTagType {
     Opening,
     OpeningStart,
     SelfClosing,
     Closing,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum JSXTagType {
-    SelfClosed,
-    Opened,
-    Closed,
-}
-
 #[derive(Debug, PartialEq)]
-enum LineType {
+pub enum LineType {
     CodeFragment,
     CodeFragmentOpen,
     CodeFragmentOpening,
@@ -497,16 +485,6 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     ))
 }
 
-fn parse_jsx_component<'a>(
-    line: &'a str,
-    component_identifier: &'a str,
-) -> IResult<&'a str, &'a str> {
-    let delimiter = &mut String::from("<");
-    delimiter.push_str(component_identifier);
-    let result = delimited(tag(delimiter.as_str()), take_until("/>"), tag("/>"))(line);
-    result
-}
-
 fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedCodeBlockMeta> {
     let (meta, _) = tag("```")(line)?;
     let (remaining_meta, language_option) =
@@ -553,39 +531,6 @@ fn parse_html_block_level_comment_first_line(line: &str) -> IResult<&str, &str> 
 
 fn parse_html_block_level_comment_last_line(line: &str) -> IResult<&str, &str> {
     terminated(take_until("-->"), tag("-->"))(line)
-}
-
-fn parse_jsx_component_first_line<'a>(
-    line: &'a str,
-    component_identifier: &'a str,
-) -> IResult<&'a str, (&'a str, &'a JSXTagType)> {
-    let left_delimiter = &mut String::from("<");
-    left_delimiter.push_str(component_identifier);
-    let result = alt((
-        value(
-            (line, &JSXTagType::SelfClosed),
-            delimited(tag(left_delimiter.as_str()), take_until("/>"), tag("/>")),
-        ),
-        value(
-            (line, &JSXTagType::Closed),
-            delimited(tag(left_delimiter.as_str()), take_until(">"), tag(">")),
-        ),
-        value(
-            (line, &JSXTagType::Opened),
-            preceded(tag(left_delimiter.as_str()), rest),
-        ),
-    ))(line)?;
-    Ok(result)
-}
-
-fn parse_jsx_component_last_line<'a>(
-    line: &'a str,
-    component_identifier: &'a str,
-) -> IResult<&'a str, &'a str> {
-    let delimiter = &mut String::from("</");
-    delimiter.push_str(component_identifier);
-    let result = tag(delimiter.as_str())(line);
-    result
 }
 
 fn parse_table_column_alignment(line: &str) -> IResult<&str, TableAlign> {
@@ -683,119 +628,6 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
 
-fn form_jsx_component_first_line<'a>(
-    line: &'a str,
-    component_identifier: &'a str,
-) -> IResult<&'a str, (String, HTMLTagType, usize)> {
-    let (remaining_line, (component_name, _attributes, tag_type)) = alt((
-        parse_self_closing_html_tag,
-        parse_opening_html_tag,
-        parse_opening_html_tag_start,
-    ))(line)?;
-    all_consuming(tag(component_identifier))(component_name)?; // check names match
-    match tag_type {
-        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
-            Ok((remaining_line, (line.to_string(), tag_type, 0)))
-        }
-        HTMLTagType::Closing => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
-    }
-}
-
-// assumed tag is opened in earlier line and this has been recognised
-fn form_jsx_component_opening_line(line: &str) -> IResult<&str, (String, HTMLTagType, usize)> {
-    let (remaining_line, (_attributes, tag_type)) =
-        alt((parse_self_closing_html_tag_end, parse_opening_html_tag_end))(line)?;
-    match tag_type {
-        HTMLTagType::Opening | HTMLTagType::SelfClosing => {
-            Ok((remaining_line, (line.to_string(), tag_type, 0)))
-        }
-        HTMLTagType::OpeningStart | HTMLTagType::Closing => {
-            Err(Err::Error(Error::new(line, ErrorKind::Tag)))
-        }
-    }
-}
-
-fn form_jsx_component_last_line<'a>(
-    line: &'a str,
-    component_identifier: &'a str,
-) -> IResult<&'a str, (String, HTMLTagType, usize)> {
-    let (_remaining_line, (component_name, _attributes, tag_type)) = parse_closing_html_tag(line)?;
-    all_consuming(tag(component_identifier))(component_name)?; // check names match
-    match tag_type {
-        HTMLTagType::Closing => Ok((_remaining_line, (line.to_string(), tag_type, 0))),
-        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
-            Err(Err::Error(Error::new(line, ErrorKind::Tag)))
-        }
-    }
-}
-
-fn form_code_fragment_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "CodeFragment";
-    let (_, (_parsed_value, jsx_tag_type)) =
-        parse_jsx_component_first_line(line, component_identifier)?;
-    match jsx_tag_type {
-        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::CodeFragmentOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::CodeFragmentOpening, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::CodeFragment, 0))),
-    }
-}
-
-fn form_how_to_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (remaining_line, (markup, tag_type, indentation)) =
-        form_jsx_component_first_line(line, "HowTo")?;
-    match tag_type {
-        HTMLTagType::Opening => Ok((remaining_line, (markup, LineType::HowToOpen, indentation))),
-        HTMLTagType::OpeningStart => Ok(("", (markup, LineType::HowToOpening, indentation))),
-        HTMLTagType::SelfClosing => Ok((remaining_line, (markup, LineType::HowTo, indentation))),
-        HTMLTagType::Closing => Err(Err::Error(Error::new(line, ErrorKind::Tag))),
-    }
-}
-
-fn form_image_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Image";
-    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
-    Ok(("", (format!("<Image{attributes}/>"), LineType::Image, 0)))
-}
-
-fn form_gatsby_not_maintained_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "GatsbyNotMaintained";
-    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("<GatsbyNotMaintained{attributes}/>"),
-            LineType::GatsbyNotMaintained,
-            0,
-        ),
-    ))
-}
-
-fn form_tweet_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Tweet";
-    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
-    Ok(("", (format!("<Tweet{attributes}/>"), LineType::Tweet, 0)))
-}
-
-fn form_poll_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Poll";
-    let (_, (_parsed_value, jsx_tag_type)) =
-        parse_jsx_component_first_line(line, component_identifier)?;
-    match jsx_tag_type {
-        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::PollOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::PollOpening, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Poll, 0))),
-    }
-}
-
-fn form_questions_component(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Questions";
-    let (_, attributes) = parse_jsx_component(line, component_identifier)?;
-    Ok((
-        "",
-        (format!("<Questions{attributes}/>"), LineType::Questions, 0),
-    ))
-}
-
 fn form_table_body_row(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_, cells) = parse_table_line(line)?;
     let mut markup = String::from("    <tr>");
@@ -862,54 +694,6 @@ fn form_table_head_last_line(line: &str) -> IResult<&str, (String, LineType, usi
     alt((form_table_header_row, form_table_head_row))(line)
 }
 
-fn form_video_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Video";
-    let (_, (__parsed_value_, jsx_tag_type)) =
-        parse_jsx_component_first_line(line, component_identifier)?;
-    match jsx_tag_type {
-        JSXTagType::Closed => Ok(("", (line.to_string(), LineType::VideoOpen, 0))),
-        JSXTagType::Opened => Ok(("", (line.to_string(), LineType::VideoOpening, 0))),
-        JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::Video, 0))),
-    }
-}
-
-// handles the continuation of an opening tag
-fn form_how_to_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (remaining_line, (markup, tag_type, indentation)) = form_jsx_component_opening_line(line)?;
-    match tag_type {
-        HTMLTagType::Opening | HTMLTagType::SelfClosing => {
-            Ok((remaining_line, (markup, LineType::HowToOpen, indentation)))
-        }
-        _ => Ok((
-            "",
-            (String::from(line), LineType::HowToOpening, indentation),
-        )),
-    }
-}
-
-fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (_, line_type) = alt((
-        map(terminated(take_until("/>"), tag("/>")), |_| LineType::Poll),
-        map(terminated(take_until(">"), tag(">")), |_| {
-            LineType::PollOpen
-        }),
-        map(rest, |_| LineType::PollOpening),
-    ))(line)?;
-    Ok(("", (line.to_string(), line_type, 0)))
-}
-
-fn form_video_component_opening_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (remaining_line, (markup, tag_type, indentation)) = form_jsx_component_opening_line(line)?;
-    match tag_type {
-        HTMLTagType::Opening => Ok((remaining_line, (markup, LineType::VideoOpen, indentation))),
-        HTMLTagType::SelfClosing => Ok((remaining_line, (markup, LineType::Video, indentation))),
-        _ => Ok((
-            "",
-            (String::from(line), LineType::VideoOpening, indentation),
-        )),
-    }
-}
-
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
     Ok(("", (String::from("  `} />"), LineType::FencedCodeBlock, 0)))
@@ -924,46 +708,6 @@ fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, 
         (
             format!("{initial_segment}{final_segment}"),
             LineType::CodeFragment,
-            0,
-        ),
-    ))
-}
-
-// assumed tag is already open
-fn form_how_to_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let (remaining_line, (markup, tag_type, indentation)) =
-        form_jsx_component_last_line(line, "HowTo")?;
-    match tag_type {
-        HTMLTagType::Closing => Ok((remaining_line, (markup, LineType::HowTo, indentation))),
-        HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
-            Ok((remaining_line, (markup, LineType::HowToOpen, indentation)))
-        }
-    }
-}
-
-fn form_poll_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Poll";
-    let (final_segment, initial_segment) =
-        parse_jsx_component_last_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::Poll,
-            0,
-        ),
-    ))
-}
-
-fn form_video_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "Video";
-    let (final_segment, initial_segment) =
-        parse_jsx_component_last_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::Video,
             0,
         ),
     ))
@@ -1328,89 +1072,6 @@ fn parse_open_html_block(
     }
 }
 
-fn parse_open_jsx_block(
-    line: &str,
-    open_jsx_component_type: Option<&JSXComponentType>,
-) -> Option<(String, LineType, usize)> {
-    match open_jsx_component_type {
-        Some(JSXComponentType::HowToOpening) => match form_how_to_component_opening_line(line) {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::HowToOpening, 0)),
-        },
-        Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-        },
-        Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-        },
-        Some(JSXComponentType::FencedCodeBlock) => {
-            match alt((form_fenced_code_block_last_line,))(line) {
-                Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => Some((escape_code(line), LineType::FencedCodeBlockOpen, 0)),
-            }
-        }
-        Some(JSXComponentType::HowTo) => match alt((
-            form_fenced_code_block_first_line,
-            form_video_component_first_line,
-            form_how_to_component_last_line,
-        ))(line)
-        {
-            Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
-                    None
-                }
-            }
-            Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
-        },
-        Some(_) => {
-            match alt((
-                form_code_fragment_component_last_line,
-                form_poll_component_last_line,
-                form_video_component_last_line,
-            ))(line)
-            {
-                Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
-            }
-        }
-        None => None,
-    }
-}
-
 fn parse_mdx_lines<B>(
     line: &str,
     lines_iterator: std::io::Lines<B>,
@@ -1431,19 +1092,6 @@ where
             },
         },
     }
-    // if let Some(line) = lines_iterator.next() {
-    //     (
-    //         lines_iterator,
-    //         parse_mdx_line(
-    //             &line.unwrap(),
-    //             open_markdown_block,
-    //             open_html_block_elements,
-    //             open_jsx_components,
-    //         ),
-    //     )
-    // } else {
-    //     (lines_iterator, None)
-    // }
 }
 
 fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
@@ -1537,7 +1185,8 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
     let mut open_lists = Stack::new();
 
     // used to keep a track of open blocks
-    let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
+    // let mut open_jsx_component_type: Stack<JSXComponentType> = Stack::new();
+    let mut open_jsx_component_register = JSXComponentRegister::new();
     let mut open_html_block_element_stack: Stack<HTMLBlockElementType> = Stack::new();
     let mut open_markdown_block_stack: Stack<MarkdownBlock> = Stack::new();
 
@@ -1555,7 +1204,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
             lines_iterator,
             open_markdown_block_stack.peek(),
             open_html_block_element_stack.peek(),
-            open_jsx_component_type.peek(),
+            open_jsx_component_register.peek(),
         );
         lines_iterator = lines_iterator_current;
         match parsed_line {
@@ -1613,27 +1262,27 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                 }
                 LineType::Poll => {
                     present_jsx_component_types.insert(JSXComponentType::Poll);
-                    open_jsx_component_type.pop();
+                    open_jsx_component_register.pop();
                     tokens.push(line);
                 }
                 LineType::Video => {
                     present_jsx_component_types.insert(JSXComponentType::Video);
-                    open_jsx_component_type.pop();
+                    open_jsx_component_register.pop();
                     tokens.push(line);
                 }
                 LineType::FencedCodeBlock => {
                     present_jsx_component_types.insert(JSXComponentType::CodeFragment);
-                    open_jsx_component_type.pop();
+                    open_jsx_component_register.pop();
                     tokens.push(line);
                 }
                 LineType::CodeFragment => {
                     present_jsx_component_types.insert(JSXComponentType::CodeFragment);
-                    open_jsx_component_type.pop();
+                    open_jsx_component_register.pop();
                     tokens.push(line);
                 }
                 LineType::HowTo => {
                     present_jsx_component_types.insert(JSXComponentType::HowTo);
-                    open_jsx_component_type.pop();
+                    open_jsx_component_register.pop();
                     tokens.push(line);
                 }
                 LineType::Image => {
@@ -1669,67 +1318,69 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
                     tokens.push(line);
                 }
                 LineType::FencedCodeBlockOpen => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::FencedCodeBlock) {
-                        open_jsx_component_type.push(JSXComponentType::FencedCodeBlock);
+                    if open_jsx_component_register.peek()
+                        != Some(&JSXComponentType::FencedCodeBlock)
+                    {
+                        open_jsx_component_register.push(JSXComponentType::FencedCodeBlock);
                     }
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpen => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::CodeFragment) {
-                        open_jsx_component_type.push(JSXComponentType::CodeFragment);
+                    if open_jsx_component_register.peek() != Some(&JSXComponentType::CodeFragment) {
+                        open_jsx_component_register.push(JSXComponentType::CodeFragment);
                     }
                     tokens.push(line);
                 }
                 LineType::CodeFragmentOpening => {
-                    if open_jsx_component_type.peek()
+                    if open_jsx_component_register.peek()
                         != Some(&JSXComponentType::CodeFragmentOpening)
                     {
-                        open_jsx_component_type.push(JSXComponentType::CodeFragmentOpening);
+                        open_jsx_component_register.push(JSXComponentType::CodeFragmentOpening);
                     }
                     tokens.push(line);
                 }
                 LineType::HowToOpen => {
-                    let current_open_jsx_component = open_jsx_component_type.peek();
+                    let current_open_jsx_component = open_jsx_component_register.peek();
                     if current_open_jsx_component == Some(&JSXComponentType::HowToOpening) {
-                        open_jsx_component_type.pop();
-                        open_jsx_component_type.push(JSXComponentType::HowTo);
+                        open_jsx_component_register.pop();
+                        open_jsx_component_register.push(JSXComponentType::HowTo);
                     } else if current_open_jsx_component != Some(&JSXComponentType::HowTo) {
-                        open_jsx_component_type.push(JSXComponentType::HowTo);
+                        open_jsx_component_register.push(JSXComponentType::HowTo);
                     }
                     tokens.push(line);
                 }
                 LineType::HowToOpening => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::HowToOpening) {
-                        open_jsx_component_type.push(JSXComponentType::HowToOpening);
+                    if open_jsx_component_register.peek() != Some(&JSXComponentType::HowToOpening) {
+                        open_jsx_component_register.push(JSXComponentType::HowToOpening);
                     }
                     tokens.push(line);
                 }
                 LineType::PollOpen => {
                     present_jsx_component_types.insert(JSXComponentType::Poll);
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::Poll) {
-                        open_jsx_component_type.push(JSXComponentType::Poll);
+                    if open_jsx_component_register.peek() != Some(&JSXComponentType::Poll) {
+                        open_jsx_component_register.push(JSXComponentType::Poll);
                     }
                     tokens.push(line);
                 }
                 LineType::PollOpening => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::PollOpening) {
-                        open_jsx_component_type.push(JSXComponentType::PollOpening);
+                    if open_jsx_component_register.peek() != Some(&JSXComponentType::PollOpening) {
+                        open_jsx_component_register.push(JSXComponentType::PollOpening);
                     }
                     tokens.push(line);
                 }
                 LineType::VideoOpen => {
-                    let current_open_jsx_component = open_jsx_component_type.peek();
+                    let current_open_jsx_component = open_jsx_component_register.peek();
                     if current_open_jsx_component == Some(&JSXComponentType::VideoOpening) {
-                        open_jsx_component_type.pop();
-                        open_jsx_component_type.push(JSXComponentType::Video);
+                        open_jsx_component_register.pop();
+                        open_jsx_component_register.push(JSXComponentType::Video);
                     } else if current_open_jsx_component != Some(&JSXComponentType::Video) {
-                        open_jsx_component_type.push(JSXComponentType::Video);
+                        open_jsx_component_register.push(JSXComponentType::Video);
                     }
                     tokens.push(line);
                 }
                 LineType::VideoOpening => {
-                    if open_jsx_component_type.peek() != Some(&JSXComponentType::VideoOpening) {
-                        open_jsx_component_type.push(JSXComponentType::VideoOpening);
+                    if open_jsx_component_register.peek() != Some(&JSXComponentType::VideoOpening) {
+                        open_jsx_component_register.push(JSXComponentType::VideoOpening);
                     }
                     tokens.push(line);
                 }

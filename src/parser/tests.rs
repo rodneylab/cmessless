@@ -2,20 +2,19 @@ use crate::parser::{
     discard_leading_whitespace, escape_code, form_code_fragment_component_first_line,
     form_code_span_line, form_fenced_code_block_first_line, form_html_anchor_element_line,
     form_html_block_level_comment_first_line, form_html_block_level_comment_last_line,
-    form_inline_wrap_text, form_jsx_component_first_line, form_ordered_list_line,
-    form_table_body_last_line, form_table_body_row, form_table_head_first_line,
-    form_table_head_last_line, form_table_head_row, form_table_header_row, format_heading_widows,
-    parse_closing_html_tag, parse_fenced_code_block_first_line, parse_heading_text,
-    parse_href_scheme, parse_html_block_level_comment_last_line, parse_html_tag_attribute,
-    parse_html_tag_attributes, parse_html_tag_content, parse_inline_wrap_segment,
-    parse_inline_wrap_text, parse_jsx_component, parse_jsx_component_first_line, parse_mdx_line,
+    form_inline_wrap_text, form_ordered_list_line, form_table_body_last_line, form_table_body_row,
+    form_table_head_first_line, form_table_head_last_line, form_table_head_row,
+    form_table_header_row, format_heading_widows, parse_closing_html_tag,
+    parse_fenced_code_block_first_line, parse_heading_text, parse_href_scheme,
+    parse_html_block_level_comment_last_line, parse_html_tag_attribute, parse_html_tag_attributes,
+    parse_html_tag_content, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
     parse_opening_html_tag, parse_opening_html_tag_end, parse_opening_html_tag_no_attributes,
     parse_opening_html_tag_start, parse_opening_html_tag_with_attributes, parse_ordered_list_text,
     parse_self_closing_html_tag, parse_self_closing_html_tag_end, parse_table_cell,
     parse_table_column_alignment, parse_table_header_row, parse_table_line,
     parse_unordered_list_text, parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag,
     remove_html_tags, segment_emphasis_line, segment_strong_emphasis_line, slugify_title,
-    HTMLTagType, JSXTagType, LineType, TableAlign,
+    HTMLTagType, LineType, TableAlign,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -258,33 +257,6 @@ pub fn test_form_inline_wrap_text() {
     // add paragraph containing inline code fragment and emphasised text
     let mdx_line = "To me `E=mc^2` rather than `F=ma` is **the** most important equation.";
     assert_eq!(form_inline_wrap_text(mdx_line), Ok(("", (String::from("<p>To me <InlineCodeFragment code={`E=mc^2`} /> rather than <InlineCodeFragment code={`F=ma`} /> is <strong>the</strong> most important equation.</p>"), LineType::Paragraph, 0))) );
-}
-
-#[test]
-pub fn test_form_jsx_component_first_line() {
-    let mdx_line = "<Component />";
-    assert_eq!(
-        form_jsx_component_first_line(mdx_line, "Component"),
-        Ok((
-            "",
-            (String::from("<Component />"), HTMLTagType::SelfClosing, 0)
-        ))
-    );
-
-    let mdx_line = "<ComponentPure />";
-    assert_eq!(
-        form_jsx_component_first_line(mdx_line, "Component"),
-        Err(Err::Error(Error::new("Pure", ErrorKind::Eof)))
-    );
-
-    let mdx_line = "<Component";
-    assert_eq!(
-        form_jsx_component_first_line(mdx_line, "Component"),
-        Ok((
-            "",
-            (String::from("<Component"), HTMLTagType::OpeningStart, 0)
-        ))
-    );
 }
 
 #[test]
@@ -619,36 +591,6 @@ pub fn test_parse_html_tag_content() {
     assert_eq!(
         parse_html_tag_content(tag_content),
         Ok(("/>", ("main", "class=\"container\" ")))
-    );
-}
-
-#[test]
-pub fn test_parse_jsx_component() {
-    let mdx_line = "<Questions {questions} />";
-    assert_eq!(
-        parse_jsx_component(mdx_line, "Questions"),
-        Ok(("", " {questions} "))
-    );
-}
-
-#[test]
-pub fn test_parse_jsx_component_first_line() {
-    let mdx_line = "<CodeFragment";
-    assert_eq!(
-        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", ("<CodeFragment", &JSXTagType::Opened)))
-    );
-
-    let mdx_line = "<CodeFragment count={3} >";
-    assert_eq!(
-        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", ("<CodeFragment count={3} >", &JSXTagType::Closed)))
-    );
-
-    let mdx_line = "<CodeFragment count={3} />";
-    assert_eq!(
-        parse_jsx_component_first_line(mdx_line, "CodeFragment"),
-        Ok(("", ("<CodeFragment count={3} />", &JSXTagType::SelfClosed)))
     );
 }
 
