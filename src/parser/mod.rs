@@ -1,18 +1,16 @@
 #[cfg(test)]
 mod tests;
-use crate::parser::jsx::form_code_fragment_component_first_line;
-use crate::parser::jsx::form_gatsby_not_maintained_component;
-use crate::parser::jsx::form_how_to_component_first_line;
-use crate::parser::jsx::form_image_component;
-use crate::parser::jsx::form_poll_component_first_line;
-use crate::parser::jsx::form_questions_component;
-use crate::parser::jsx::parse_jsx_component_last_line;
-use crate::parser::jsx::parse_open_jsx_block;
-use crate::parser::jsx::{
-    form_tweet_component, form_video_component_first_line, JSXComponentRegister, JSXComponentType,
-};
-use crate::utility::stack::Stack;
+
 pub mod jsx;
+use crate::{
+    parser::jsx::{
+        form_code_fragment_component_first_line, form_gatsby_not_maintained_component,
+        form_how_to_component_first_line, form_image_component, form_poll_component_first_line,
+        form_questions_component, form_tweet_component, form_video_component_first_line,
+        parse_open_jsx_block, JSXComponentRegister, JSXComponentType,
+    },
+    utility::stack::Stack,
+};
 
 use deunicode::deunicode;
 use nom::{
@@ -697,20 +695,6 @@ fn form_table_head_last_line(line: &str) -> IResult<&str, (String, LineType, usi
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_final_segment, _initial_segment) = parse_fenced_code_block_last_line(line)?;
     Ok(("", (String::from("  `} />"), LineType::FencedCodeBlock, 0)))
-}
-
-fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    let component_identifier = "CodeFragment";
-    let (final_segment, initial_segment) =
-        parse_jsx_component_last_line(line, component_identifier)?;
-    Ok((
-        "",
-        (
-            format!("{initial_segment}{final_segment}"),
-            LineType::CodeFragment,
-            0,
-        ),
-    ))
 }
 
 fn form_emphasis_line(line: &str) -> IResult<&str, String> {

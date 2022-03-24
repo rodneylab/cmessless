@@ -1,13 +1,15 @@
 #[cfg(test)]
 mod tests;
 
-use crate::parser::{
-    escape_code, form_code_fragment_component_last_line, form_fenced_code_block_first_line,
-    form_fenced_code_block_last_line, parse_closing_html_tag, parse_opening_html_tag,
-    parse_opening_html_tag_end, parse_opening_html_tag_start, parse_self_closing_html_tag,
-    parse_self_closing_html_tag_end, HTMLTagType, LineType,
+use crate::{
+    parser::{
+        escape_code, form_fenced_code_block_first_line, form_fenced_code_block_last_line,
+        parse_closing_html_tag, parse_opening_html_tag, parse_opening_html_tag_end,
+        parse_opening_html_tag_start, parse_self_closing_html_tag, parse_self_closing_html_tag_end,
+        HTMLTagType, LineType,
+    },
+    utility::stack::Stack,
 };
-use crate::utility::stack::Stack;
 
 use nom::{
     branch::alt,
@@ -97,7 +99,7 @@ fn parse_jsx_component_first_line<'a>(
     Ok(result)
 }
 
-pub fn parse_jsx_component_last_line<'a>(
+fn parse_jsx_component_last_line<'a>(
     line: &'a str,
     component_identifier: &'a str,
 ) -> IResult<&'a str, &'a str> {
@@ -164,6 +166,20 @@ pub fn form_code_fragment_component_first_line(
         JSXTagType::Opened => Ok(("", (line.to_string(), LineType::CodeFragmentOpening, 0))),
         JSXTagType::SelfClosed => Ok(("", (line.to_string(), LineType::CodeFragment, 0))),
     }
+}
+
+fn form_code_fragment_component_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
+    let component_identifier = "CodeFragment";
+    let (final_segment, initial_segment) =
+        parse_jsx_component_last_line(line, component_identifier)?;
+    Ok((
+        "",
+        (
+            format!("{initial_segment}{final_segment}"),
+            LineType::CodeFragment,
+            0,
+        ),
+    ))
 }
 
 pub fn form_how_to_component_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
