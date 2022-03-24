@@ -1421,14 +1421,16 @@ fn parse_mdx_lines<B>(
 where
     B: BufRead,
 {
-    let parsed_line = parse_mdx_line(
-        line,
-        open_markdown_block,
-        open_html_block_elements,
-        open_jsx_components,
-    );
-    (lines_iterator, parsed_line)
-
+    match parse_open_markdown_block(line, open_markdown_block) {
+        Some(value) => (lines_iterator, Some(value)),
+        None => match parse_open_html_block(line, open_html_block_elements) {
+            Some(value) => (lines_iterator, Some(value)),
+            None => match parse_open_jsx_block(line, open_jsx_components) {
+                Some(value) => (lines_iterator, Some(value)),
+                None => (lines_iterator, parse_mdx_line(line)),
+            },
+        },
+    }
     // if let Some(line) = lines_iterator.next() {
     //     (
     //         lines_iterator,
@@ -1444,50 +1446,34 @@ where
     // }
 }
 
-fn parse_mdx_line(
-    line: &str,
-    open_markdown_block: Option<&MarkdownBlock>,
-    open_html_block_elements: Option<&HTMLBlockElementType>,
-    open_jsx_components: Option<&JSXComponentType>,
-) -> Option<(String, LineType, usize)> {
-    match parse_open_markdown_block(line, open_markdown_block) {
-        Some(value) => Some(value),
-        None => match parse_open_html_block(line, open_html_block_elements) {
-            Some(value) => Some(value),
-            None => match parse_open_jsx_block(line, open_jsx_components) {
-                Some(value) => Some(value),
-                None => {
-                    match alt((
-                        form_code_fragment_component_first_line,
-                        form_fenced_code_block_first_line,
-                        form_how_to_component_first_line,
-                        form_html_block_level_comment_first_line,
-                        form_html_block_element_first_line,
-                        form_table_head_first_line,
-                        form_image_component,
-                        form_poll_component_first_line,
-                        form_questions_component,
-                        form_tweet_component,
-                        form_gatsby_not_maintained_component,
-                        form_video_component_first_line,
-                        form_heading_line,
-                        form_ordered_list_first_line,
-                        form_unordered_list_line,
-                        form_inline_wrap_text,
-                    ))(line)
-                    {
-                        Ok((_, (line, line_type, level))) => {
-                            if !line.is_empty() {
-                                Some((line, line_type, level))
-                            } else {
-                                None
-                            }
-                        }
-                        Err(_) => None,
-                    }
-                }
-            },
-        },
+fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
+    match alt((
+        form_code_fragment_component_first_line,
+        form_fenced_code_block_first_line,
+        form_how_to_component_first_line,
+        form_html_block_level_comment_first_line,
+        form_html_block_element_first_line,
+        form_table_head_first_line,
+        form_image_component,
+        form_poll_component_first_line,
+        form_questions_component,
+        form_tweet_component,
+        form_gatsby_not_maintained_component,
+        form_video_component_first_line,
+        form_heading_line,
+        form_ordered_list_first_line,
+        form_unordered_list_line,
+        form_inline_wrap_text,
+    ))(line)
+    {
+        Ok((_, (line, line_type, level))) => {
+            if !line.is_empty() {
+                Some((line, line_type, level))
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
     }
 }
 
