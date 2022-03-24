@@ -1411,6 +1411,39 @@ fn parse_open_jsx_block(
     }
 }
 
+fn parse_mdx_lines<B>(
+    line: &str,
+    lines_iterator: std::io::Lines<B>,
+    open_markdown_block: Option<&MarkdownBlock>,
+    open_html_block_elements: Option<&HTMLBlockElementType>,
+    open_jsx_components: Option<&JSXComponentType>,
+) -> (std::io::Lines<B>, Option<(String, LineType, usize)>)
+where
+    B: BufRead,
+{
+    let parsed_line = parse_mdx_line(
+        line,
+        open_markdown_block,
+        open_html_block_elements,
+        open_jsx_components,
+    );
+    (lines_iterator, parsed_line)
+
+    // if let Some(line) = lines_iterator.next() {
+    //     (
+    //         lines_iterator,
+    //         parse_mdx_line(
+    //             &line.unwrap(),
+    //             open_markdown_block,
+    //             open_html_block_elements,
+    //             open_jsx_components,
+    //         ),
+    //     )
+    // } else {
+    //     (lines_iterator, None)
+    // }
+}
+
 fn parse_mdx_line(
     line: &str,
     open_markdown_block: Option<&MarkdownBlock>,
@@ -1524,14 +1557,22 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
 
     let mut present_jsx_component_types: HashSet<JSXComponentType> = HashSet::new();
 
-    for line in reader.lines().skip(frontmatter_end_line_number) {
+    let mut lines_iterator = reader.lines();
+    if frontmatter_end_line_number > 0 {
+        lines_iterator.nth(frontmatter_end_line_number - 1); // discard frontmatter
+    }
+    while let Some(line) = lines_iterator.next() {
         let line_content = line.unwrap();
-        match parse_mdx_line(
+
+        let (lines_iterator_current, parsed_line) = parse_mdx_lines(
             &line_content,
+            lines_iterator,
             open_markdown_block_stack.peek(),
             open_html_block_element_stack.peek(),
             open_jsx_component_type.peek(),
-        ) {
+        );
+        lines_iterator = lines_iterator_current;
+        match parsed_line {
             Some((line, line_type, indentation)) => match line_type {
                 LineType::OrderedList => {
                     open_markdown_block_stack.pop();
