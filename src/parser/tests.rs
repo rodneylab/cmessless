@@ -583,6 +583,14 @@ pub fn test_parse_html_tag_attributes() {
     assert_eq!(result.len(), 2);
     assert_eq!(result[0], ("href", "https://example.com"));
     assert_eq!(result[1], ("target", "_blank"));
+
+    let attributes = "text=\"The URL is https://www.example.com/home\"";
+    let (_, result) = parse_html_tag_attributes(attributes).unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(
+        result[0],
+        ("text", "The URL is https://www.example.com/home")
+    );
 }
 
 #[test]
@@ -592,6 +600,12 @@ pub fn test_parse_html_tag_content() {
         parse_html_tag_content(tag_content),
         Ok(("/>", ("main", "class=\"container\" ")))
     );
+
+    //     let tag_content = "main class=\"contain/er\" />";
+    // assert_eq!(
+    //     parse_html_tag_content(tag_content),
+    //     Ok(("/>", ("main", "class=\"contain/er\" ")))
+    // );
 }
 
 #[test]
@@ -754,6 +768,12 @@ pub fn test_parse_opening_html_tag_end() {
     assert_eq!(
         parse_opening_html_tag_end(tag),
         Ok((" ", ("", HTMLTagType::Opening)))
+    );
+
+    let tag = "  id=\"some_id\"  ";
+    assert_eq!(
+        parse_opening_html_tag_end(tag),
+        Ok(("", ("id=\"some_id\"  ", HTMLTagType::OpeningStart)))
     );
 }
 
