@@ -40,7 +40,7 @@ struct Cli {
     #[clap(short, long)]
     watch: bool,
 
-    #[clap(parse(from_os_str))]
+    #[clap(value_parser)]
     #[clap(short, long)]
     output: std::path::PathBuf,
 }
@@ -113,6 +113,20 @@ fn parse_then_watch(mdx_paths: &[PathBuf], output_path: &Path, verbose: bool) ->
     );
     watch(&handler)
 }
+
+//     let config = ConfigBuilder::default()
+//         .clear_screen(true)
+//         .run_initially(true)
+//         .paths(mdx_paths)
+//         .cmd(command)
+//         .build()
+//         .expect("[ ERROR ] Issue while configuring watchexec");
+
+//     let handler = CmslessHandler(
+//         ExecHandler::new(config).expect("[ ERROR ] Issue while creating watchexec handler"),
+//     );
+//     watch(&handler)
+// }
 
 fn relative_output_path_from_input(input_path: &Path, relative_output_path: &Path) -> PathBuf {
     match input_path.to_string_lossy().find("/./") {
@@ -188,6 +202,7 @@ fn get_piped_input() -> Vec<PathBuf> {
     result
 }
 
+// #[tokio::main]
 fn main() -> Result<()> {
     let cli = &Cli::parse();
     if cli.check {
