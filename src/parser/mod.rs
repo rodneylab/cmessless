@@ -771,14 +771,11 @@ fn form_inline_wrap_text_number_range(line: &str) -> IResult<&str, String> {
 }
 
 fn form_inline_wrap_inline_code_fragment(line: &str) -> IResult<&str, String> {
-    println!("trying code fragment part: {line}");
     let (remaining_line, tag_content) = delimited(
         tag("<InlineCodeFragment code={`"),
         take_until("/>"),
         tag("/>"),
     )(line)?;
-
-    println!("and here..");
 
     Ok((
         remaining_line,
