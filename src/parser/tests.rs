@@ -4,17 +4,18 @@ use crate::parser::{
     form_html_block_level_comment_first_line, form_html_block_level_comment_last_line,
     form_inline_wrap_text, form_ordered_list_line, form_table_body_last_line, form_table_body_row,
     form_table_head_first_line, form_table_head_last_line, form_table_head_row,
-    form_table_header_row, format_heading_widows, parse_closing_html_tag,
-    parse_fenced_code_block_first_line, parse_heading_text, parse_href_scheme,
-    parse_html_block_level_comment_last_line, parse_html_tag_attribute, parse_html_tag_attributes,
-    parse_html_tag_content, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
-    parse_opening_html_tag, parse_opening_html_tag_end, parse_opening_html_tag_no_attributes,
-    parse_opening_html_tag_start, parse_opening_html_tag_with_attributes, parse_ordered_list_text,
-    parse_self_closing_html_tag, parse_self_closing_html_tag_end, parse_table_cell,
-    parse_table_column_alignment, parse_table_header_row, parse_table_line,
-    parse_unordered_list_text, parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag,
-    remove_html_tags, segment_emphasis_line, segment_strong_emphasis_line, slugify_title,
-    HTMLTagType, LineType, TableAlign,
+    form_table_header_row, format_heading_widows, format_inline_wrap_text_number_range,
+    parse_closing_html_tag, parse_fenced_code_block_first_line, parse_heading_text,
+    parse_href_scheme, parse_html_block_level_comment_last_line, parse_html_tag_attribute,
+    parse_html_tag_attributes, parse_html_tag_content, parse_inline_wrap_segment,
+    parse_inline_wrap_text, parse_mdx_line, parse_opening_html_tag, parse_opening_html_tag_end,
+    parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
+    parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
+    parse_self_closing_html_tag_end, parse_table_cell, parse_table_column_alignment,
+    parse_table_header_row, parse_table_line, parse_unordered_list_text,
+    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, remove_html_tags,
+    segment_emphasis_line, segment_strong_emphasis_line, slugify_title, HTMLTagType, LineType,
+    TableAlign,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -461,6 +462,35 @@ pub fn test_format_heading_widows() {
     assert_eq!(
         format_heading_widows(title),
         "\\u201cIntroducing\\u201d the zoo\\u2018s new elephant"
+    );
+}
+
+#[test]
+pub fn test_format_inline_wrap_text_number_range() {
+    let line = "<InlineCodeFragment code={`1`} />&ndash;<InlineCodeFragment code={`3`} />";
+    assert_eq!(
+        format_inline_wrap_text_number_range(line),
+        Ok(("", String::from("<InlineCodeFragment code={`1`} />&thinsp;&ndash;&thinsp;<InlineCodeFragment code={`3`} />")))
+    );
+
+    let line =
+        "<InlineCodeFragment code={`1`} />&ndash;<InlineCodeFragment code={`3`} /> is in fact";
+    assert_eq!(
+        format_inline_wrap_text_number_range(line),
+        Ok(("", String::from("<InlineCodeFragment code={`1`} />&thinsp;&ndash;&thinsp;<InlineCodeFragment code={`3`} /> is in fact")))
+    );
+
+    let line =
+        "Interestingly, <InlineCodeFragment code={`1`} />&ndash;<InlineCodeFragment code={`3`} /> is in fact";
+    assert_eq!(
+        format_inline_wrap_text_number_range(line),
+        Ok(("", String::from("Interestingly, <InlineCodeFragment code={`1`} />&thinsp;&ndash;&thinsp;<InlineCodeFragment code={`3`} /> is in fact")))
+    );
+    let line =
+        "Interestingly <InlineCodeFragment code={`x`} /> and <InlineCodeFragment code={`1`} />&ndash;<InlineCodeFragment code={`3`} /> is in fact";
+    assert_eq!(
+        format_inline_wrap_text_number_range(line),
+        Ok(("", String::from("Interestingly <InlineCodeFragment code={`x`} /> and <InlineCodeFragment code={`1`} />&thinsp;&ndash;&thinsp;<InlineCodeFragment code={`3`} /> is in fact")))
     );
 }
 

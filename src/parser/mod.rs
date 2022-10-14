@@ -11,13 +11,12 @@ use crate::{
     },
     utility::stack::Stack,
 };
-
 use deunicode::deunicode;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1},
-    combinator::{opt, peek, rest, value},
+    combinator::{opt, peek, recognize, rest, value},
     error::{Error, ErrorKind},
     multi::{many0, many0_count, many1, many1_count},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -752,6 +751,60 @@ fn form_strong_emphasis_line(line: &str) -> IResult<&str, String> {
     }
 }
 
+fn form_inline_wrap_text_number_range(line: &str) -> IResult<&str, String> {
+    let (remaining_line, first_tag) = recognize(separated_pair(
+        tag("<InlineCodeFragment code={`"),
+        digit1,
+        tag("`} />"),
+    ))(line)?;
+    let (remaining_line, _) = alt((tag("&ndash;"), tag("-")))(remaining_line)?;
+    let (remaining_line, second_tag) = recognize(separated_pair(
+        tag("<InlineCodeFragment code={`"),
+        digit1,
+        tag("`} />"),
+    ))(remaining_line)?;
+
+    Ok((
+        remaining_line,
+        format!("{first_tag}&thinsp;&ndash;&thinsp;{second_tag}"),
+    ))
+}
+
+fn form_inline_wrap_inline_code_fragment(line: &str) -> IResult<&str, String> {
+    println!("trying code fragment part: {line}");
+    let (remaining_line, tag_content) = delimited(
+        tag("<InlineCodeFragment code={`"),
+        take_until("/>"),
+        tag("/>"),
+    )(line)?;
+
+    println!("and here..");
+
+    Ok((
+        remaining_line,
+        format!("<InlineCodeFragment code={{`{tag_content}/>"),
+    ))
+}
+
+fn format_inline_wrap_text_number_range(line: &str) -> IResult<&str, String> {
+    let (remaining_line, initial_part) = take_until("<InlineCodeFragment")(line)?;
+    let (remaining_line, inline_code_fragment_part) = alt((
+        form_inline_wrap_text_number_range,
+        form_inline_wrap_inline_code_fragment,
+    ))(remaining_line)?;
+
+    match format_inline_wrap_text_number_range(remaining_line) {
+        Ok((_, value)) => Ok((
+            "",
+            format!("{initial_part}{inline_code_fragment_part}{value}"),
+        )),
+        Err(_) => Ok((
+            "",
+            format!("{initial_part}{inline_code_fragment_part}{remaining_line}"),
+        )),
+    }
+}
+
 fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
     fn is_wrap_tag(c: char) -> bool {
         c == '`' || c == '*' || c == '<'
@@ -892,6 +945,11 @@ fn form_unordered_list_line(line: &str) -> IResult<&str, (String, LineType, usiz
 
 fn form_inline_wrap_text(line: &str) -> IResult<&str, (String, LineType, usize)> {
     let (_, parsed_line) = parse_inline_wrap_text(line)?;
+    let parsed_line = if let Ok((_, value)) = format_inline_wrap_text_number_range(&parsed_line) {
+        value
+    } else {
+        parsed_line
+    };
     if !parsed_line.is_empty() {
         Ok((
             "",
@@ -914,71 +972,71 @@ fn form_astro_frontmatter(
     result.push(String::from("---"));
     if components.contains(&JSXComponentType::CodeFragment) {
         result.push(String::from(
-            "import CodeFragment from '$components/CodeFragment.svelte';",
+            "import CodeFragment from '~components/CodeFragment.svelte';",
         ));
     }
     result.push(String::from(
-        "import Heading from '$components/Heading.svelte';",
+        "import Heading from '~components/Heading.svelte';",
     ));
     if components.contains(&JSXComponentType::HowTo) {
         define_slug = true;
         result.push(String::from(
-            "import HowTo from '$components/HowTo/index.svelte';
-import HowToSection from '$components/HowTo/HowToSection.svelte';
-import HowToStep from '$components/HowTo/HowToStep.svelte';
-import HowToDirection from '$components/HowTo/HowToDirection.svelte';",
+            "import HowTo from '~components/HowTo/index.svelte';
+import HowToSection from '~components/HowTo/HowToSection.svelte';
+import HowToStep from '~components/HowTo/HowToStep.svelte';
+import HowToDirection from '~components/HowTo/HowToDirection.svelte';",
         ));
     }
     if components.contains(&JSXComponentType::GatsbyNotMaintained) {
         result.push(String::from(
-            "import GatsbyNotMaintained from '$components/BlogPost/GatsbyNotMaintained.svelte';",
+            "import GatsbyNotMaintained from '~components/BlogPost/GatsbyNotMaintained.svelte';",
         ));
     }
     if components.contains(&JSXComponentType::Image) {
         define_slug = true;
         image_data_imports.push(String::from("images"));
         result.push(String::from(
-            "import Image from '$components/BlogPost/Image.svelte';",
+            "import Image from '~components/BlogPost/Image.svelte';",
         ));
     }
     result.push(String::from(
-        "import LinkIcon from '$components/Icons/Link.svelte';
-import InlineCodeFragment from '$components/InlineCodeFragment.svelte';",
+        "import LinkIcon from '~components/Icons/Link.svelte';
+import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
     ));
     if components.contains(&JSXComponentType::Poll) {
         define_slug = true;
-        result.push(String::from("import Poll from '$components/Poll.svelte';"));
+        result.push(String::from("import Poll from '~components/Poll.svelte';"));
     }
     if components.contains(&JSXComponentType::Image) {
         result.push(String::from(
-            "import type { ResponsiveImage } from '$types/image';",
+            "import type { ResponsiveImage } from '~types/image';",
         ));
     }
     if components.contains(&JSXComponentType::Questions) {
         result.push(String::from(
-            "import Questions from '$components/Questions.svelte';",
+            "import Questions from '~components/Questions.svelte';",
         ));
         result.push(format!(
-            "import questions from '$content/blog/{slug}/questions.json';"
+            "import questions from '~content/blog/{slug}/questions.json';"
         ));
     }
     if components.contains(&JSXComponentType::Tweet) {
         result.push(String::from(
-            "import Tweet from '$components/Tweet.svelte';",
+            "import Tweet from '~components/Tweet.svelte';",
         ));
     }
     result.push(String::from(
-        "import TwitterMessageLink from '$components/Link/TwitterMessageLink.svelte';",
+        "import TwitterMessageLink from '~components/Link/TwitterMessageLink.svelte';",
     ));
     if components.contains(&JSXComponentType::Video) {
         define_slug = true;
         image_data_imports.push(String::from("poster"));
         result.push(String::from(
-            "import Video from '$components/Video.svelte';",
+            "import Video from '~components/Video.svelte';",
         ));
     }
     if define_slug {
-        result.push("import website from '$configuration/website';".to_string());
+        result.push("import website from '~configuration/website';".to_string());
         result.push("\nconst { nebulaUrl } = website;".to_string());
         result.push(format!("const slug = '{slug}';"));
         result.push(format!(
