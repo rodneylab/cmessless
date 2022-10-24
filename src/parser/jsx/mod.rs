@@ -925,13 +925,13 @@ pub fn parse_open_jsx_block(
                         match line_type {
                             LineType::HowToSectionOpen => Some((
                                 format!(
-                                    "  <HowToSection name=\"{value}\" position={{{position}}}>"
+                                    "  <HowToSection {{slug}} name=\"{value}\" position={{{position}}}>"
                                 ),
                                 line_type,
                                 level,
                             )),
                             LineType::HowToSectionOpening => Some((
-                                format!("  <HowToSection name=\"{value}\" position={{{position}}}"),
+                                format!("  <HowToSection {{slug}} name=\"{value}\" position={{{position}}}"),
                                 line_type,
                                 level,
                             )),
