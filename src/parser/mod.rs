@@ -630,7 +630,8 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         ),
     ) = parse_fenced_code_block_first_line(line)?;
 
-    let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
+    //let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
+    let mut markup = String::from("<CodeFragment\n  client:visible");
     if let Some(value) = language_option {
         markup.push_str("\n  language=\"");
         markup.push_str(value);
@@ -1039,14 +1040,14 @@ import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
     }
     if define_slug {
         result.push("import website from '~configuration/website';".to_string());
-        result.push("\nconst { nebulaUrl } = website;".to_string());
+        result.push("\nconst { nebulaUrl, newsletterUrl } = website;".to_string());
         result.push(format!("const slug = '{slug}';"));
         result.push(format!(
             "async function getImageData() {{
   try {{
     const response = await fetch(`${{nebulaUrl}}/post/{slug}.json`);
     const {{ data }} = await response.json();
-    return data
+    return data;
   }} catch (error) {{
     console.error(`Error getting image data: {slug}`);
   }}
@@ -1076,6 +1077,9 @@ import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
             result
                 .push("const {  poster }: {  poster: string } = await getImageData();".to_string());
         }
+    } else {
+        result.push("import website from '~configuration/website';".to_string());
+        result.push("\nconst { newsletterUrl } = website;".to_string());
     }
     for line in prepared_markup {
         result.push(line.to_string());
