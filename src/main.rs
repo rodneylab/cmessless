@@ -139,7 +139,7 @@ fn relative_output_path_from_input(input_path: &Path, relative_output_path: &Pat
 
     let mut components = input_path.components();
     loop {
-        if components.as_path().to_string_lossy().find("/./") == None {
+        if components.as_path().to_string_lossy().find("/./").is_none() {
             break;
         }
         components.next();
@@ -171,8 +171,8 @@ fn check_modified_files(mdx_paths: &[PathBuf], relative_output_path: &Path) {
             },
             Err(_) => None,
         };
-        if output_modified == None
-            || input_modified == None
+        if output_modified.is_none()
+            || input_modified.is_none()
             || input_modified.unwrap() > output_modified.unwrap()
         {
             modified_files.push(String::from(input_path.to_string_lossy()));
