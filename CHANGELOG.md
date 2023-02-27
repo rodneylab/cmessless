@@ -16,15 +16,16 @@
 - 💫 add MDX component parsing
 - 💫 add logic for parsing ordered lists
 - 💫 add rudimentary list item support
-- 💫 add parsing of anchor tags and insertion of security attributes for external links
+- 💫 add parsing of anchor tags and insertion of security attributes for
+  external links
 - 💫 add logic for parsing inline code wraps and inline emphasis
 - 💫 add logic for parsing bold text
 
 ### Refactor
 
-- 🏄🏽  simplify JSX component opening tag parsing
-- 🏄🏽  simplify JSX component opening tag parsing
-- 🏄🏽‍♂️  refactor unordered list handling to pave way for ordered lists
-- 🏄🏽  refactor heading and paragraph parsing
+- 🏄🏽 simplify JSX component opening tag parsing
+- 🏄🏽 simplify JSX component opening tag parsing
+- 🏄🏽‍♂️ refactor unordered list handling to pave way for ordered lists
+- 🏄🏽 refactor heading and paragraph parsing
 - 🏄🏽 separate parser tests to separate file
-- 🏄🏽  simplify bold text parsing
+- 🏄🏽 simplify bold text parsing
