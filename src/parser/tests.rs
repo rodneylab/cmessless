@@ -966,4 +966,7 @@ pub fn test_slugify_title() {
         slugify_title(title),
         String::from("surfer-skin-tone-4-all-about-surf")
     );
+
+    let title = "What is $lib?";
+    assert_eq!(slugify_title(title), String::from("what-is-lib"));
 }
