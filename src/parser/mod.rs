@@ -251,7 +251,7 @@ fn slugify_title(title: &str) -> String {
             let mut result = String::with_capacity(deunicoded_title.len());
             let mut last_was_replaced = true;
             let remove_characters = "?'`:[]()";
-            let replace_characters = " -/.,"; // include '-' here to avoid "--" in result
+            let replace_characters = " -/.,$"; // include '-' here to avoid "--" in result
             for chars in deunicoded_title.chars() {
                 if replace_characters.contains(chars) {
                     if !last_was_replaced {
@@ -630,7 +630,6 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         ),
     ) = parse_fenced_code_block_first_line(line)?;
 
-    //let mut markup = String::from("<CodeFragment\n  client:visible\n  set:html");
     let mut markup = String::from("<CodeFragment\n  client:visible");
     if let Some(value) = language_option {
         markup.push_str("\n  language=\"");
