@@ -11,3 +11,17 @@ repos:
   - id: clippy
   repo: https://github.com/doublify/pre-commit-rust
   rev: v1.0
+- repo: https://github.com/adamchainz/pre-commit-dprint
+  rev: v0.36.0
+  hooks:
+  -   id: dprint
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.16.1
+  hooks:
+    - id: gitleaks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+    args: [--markdown-linebreak-ext=md]
