@@ -1,8 +1,8 @@
 mod parser;
 mod utility;
 
-use atty::{is, Stream};
 use clap::Parser;
+use is_terminal::IsTerminal;
 use std::{
     fs,
     io::{self, BufRead},
@@ -210,7 +210,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let inputs = if is(Stream::Stdin) {
+    let inputs = if io::stdin().is_terminal() {
         cli.path.to_vec()
     } else {
         get_piped_input()
