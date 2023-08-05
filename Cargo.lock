@@ -207,7 +207,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "deunicode",
- "is-terminal",
  "miette",
  "nom 7.1.3",
  "tokio",

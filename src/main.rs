@@ -2,10 +2,9 @@ mod parser;
 mod utility;
 
 use clap::Parser;
-use is_terminal::IsTerminal;
 use std::{
     fs,
-    io::{self, BufRead},
+    io::{self, BufRead, IsTerminal},
     path::{Path, PathBuf},
 };
 use watchexec::{
