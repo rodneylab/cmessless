@@ -19,9 +19,9 @@ repos:
   rev: v8.16.1
   hooks:
     - id: gitleaks
-#- repo: https://github.com/pre-commit/pre-commit-hooks
-#  rev: v4.4.0
-#  hooks:
-#  - id: end-of-file-fixer
-#  - id: trailing-whitespace
-#    args: [--markdown-linebreak-ext=md]
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+    args: [--markdown-linebreak-ext=md]

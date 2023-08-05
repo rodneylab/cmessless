@@ -1,6 +1,6 @@
 [package]
 name = "cmessless"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Rodney Johnson <ask@rodneylab.com>"]
 edition = "2021"
 homepage = "https://rodneylab.com"
