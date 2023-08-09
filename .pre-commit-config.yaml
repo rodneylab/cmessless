@@ -11,10 +11,10 @@ repos:
   - id: clippy
   repo: https://github.com/doublify/pre-commit-rust
   rev: v1.0
-- repo: https://github.com/adamchainz/pre-commit-dprint
-  rev: v0.36.0
-  hooks:
-  -   id: dprint
+#- repo: https://github.com/adamchainz/pre-commit-dprint
+#  rev: v0.36.0
+#  hooks:
+#  -   id: dprint
 - repo: https://github.com/gitleaks/gitleaks
   rev: v8.16.1
   hooks:
