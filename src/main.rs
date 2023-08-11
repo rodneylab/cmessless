@@ -92,7 +92,7 @@ async fn debounce_watch<P1: AsRef<Path>, P2: AsRef<Path>>(
 }
 
 /***
- * deducde the directory to watch from an input file path which contains a '/./' pattern
+ * deduce the directory to watch from an input file path which contains a '/./' pattern
  */
 fn watch_directory_from_relative_input_path<P: AsRef<Path>>(input_path: &P) -> PathBuf {
     match input_path.as_ref().to_str() {
