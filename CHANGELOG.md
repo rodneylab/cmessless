@@ -10,8 +10,8 @@
 
 ### Refactor
 
-- 🏄🏽  replace watchexec dependency with notify (#32)
-- 🏄🏽  replace watchexec dependency with notify
+- 🏄🏽 replace watchexec dependency with notify (#32)
+- 🏄🏽 replace watchexec dependency with notify
 
 ## 1.0.0 (2023-08-05)
 
