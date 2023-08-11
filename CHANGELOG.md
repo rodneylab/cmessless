@@ -1,3 +1,18 @@
+## 2.0.0 (2023-08-11)
+
+### Fix
+
+- update CLI logic
+- **dependencies**: 💫 update crates
+- **dependencies**: 💫 update crates
+- **dependencies**: 💫 update crates (#24)
+- **dependencies**: 💫 update crates
+
+### Refactor
+
+- 🏄🏽  replace watchexec dependency with notify (#32)
+- 🏄🏽  replace watchexec dependency with notify
+
 ## 1.0.0 (2023-08-05)
 
 ### Fix
