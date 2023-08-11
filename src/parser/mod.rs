@@ -1254,14 +1254,16 @@ pub fn parse_frontmatter(file: &File) -> usize {
     line_number
 }
 
-pub fn slug_from_input_file_path(path: &Path) -> &str {
+pub fn slug_from_input_file_path<P: AsRef<Path>>(path: &P) -> &str {
     match path
+        .as_ref()
         .file_stem()
         .expect("[ ERROR ] Couldn't open that file!")
         .to_str()
     {
         Some(value) => match value {
             "index" => path
+                .as_ref()
                 .parent()
                 .expect("[ ERROR ] Couldn't open that file!")
                 .file_name()
@@ -1274,8 +1276,15 @@ pub fn slug_from_input_file_path(path: &Path) -> &str {
     }
 }
 
-pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
-    println!("[ INFO ] Parsing {:?}...", input_path);
+pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
+    input_path: &P1,
+    output_path: &P2,
+    verbose: bool,
+) {
+    println!(
+        "[ INFO ] Parsing {:?}...",
+        input_path.as_ref().display().to_string()
+    );
     let start = Instant::now();
 
     let file = File::open(input_path).expect("[ ERROR ] Couldn't open that file!");
@@ -1647,7 +1656,7 @@ pub fn parse_mdx_file(input_path: &Path, output_path: &Path, verbose: bool) {
         Ok(value) => value,
         Err(_) => panic!(
             "[ ERROR ] Was not able to create the output file: {:?}!",
-            output_path
+            output_path.as_ref().display().to_string()
         ),
     };
 
