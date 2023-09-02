@@ -230,7 +230,10 @@ fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
                         result.push_str("\\u201d")
                     }
                 }
-                _ => result.push(c),
+                _ => {
+                    preceded_by_space = false;
+                    result.push(c)
+                }
             }
         }
         Cow::Owned(result)

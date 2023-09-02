@@ -4,18 +4,18 @@ use crate::parser::{
     form_html_block_level_comment_first_line, form_html_block_level_comment_last_line,
     form_inline_wrap_text, form_ordered_list_line, form_table_body_last_line, form_table_body_row,
     form_table_head_first_line, form_table_head_last_line, form_table_head_row,
-    form_table_header_row, format_heading_widows, format_inline_wrap_text_number_range,
-    parse_closing_html_tag, parse_fenced_code_block_first_line, parse_heading_text,
-    parse_href_scheme, parse_html_block_level_comment_last_line, parse_html_tag_attribute,
-    parse_html_tag_attributes, parse_html_tag_content, parse_inline_wrap_segment,
-    parse_inline_wrap_text, parse_mdx_line, parse_opening_html_tag, parse_opening_html_tag_end,
-    parse_opening_html_tag_no_attributes, parse_opening_html_tag_start,
-    parse_opening_html_tag_with_attributes, parse_ordered_list_text, parse_self_closing_html_tag,
-    parse_self_closing_html_tag_end, parse_table_cell, parse_table_column_alignment,
-    parse_table_header_row, parse_table_line, parse_unordered_list_text,
-    parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag, remove_html_tags,
-    segment_emphasis_line, segment_strong_emphasis_line, slugify_title, HTMLTagType, LineType,
-    TableAlign,
+    form_table_header_row, format_heading, format_heading_widows,
+    format_inline_wrap_text_number_range, parse_closing_html_tag,
+    parse_fenced_code_block_first_line, parse_heading_text, parse_href_scheme,
+    parse_html_block_level_comment_last_line, parse_html_tag_attribute, parse_html_tag_attributes,
+    parse_html_tag_content, parse_inline_wrap_segment, parse_inline_wrap_text, parse_mdx_line,
+    parse_opening_html_tag, parse_opening_html_tag_end, parse_opening_html_tag_no_attributes,
+    parse_opening_html_tag_start, parse_opening_html_tag_with_attributes, parse_ordered_list_text,
+    parse_self_closing_html_tag, parse_self_closing_html_tag_end, parse_table_cell,
+    parse_table_column_alignment, parse_table_header_row, parse_table_line,
+    parse_unordered_list_text, parse_up_to_inline_wrap_segment, parse_up_to_opening_html_tag,
+    remove_html_tags, segment_emphasis_line, segment_strong_emphasis_line, slugify_title,
+    HTMLTagType, LineType, TableAlign,
 };
 use nom::{
     error::{Error, ErrorKind},
@@ -445,6 +445,30 @@ pub fn test_form_table_header_row() {
 }
 
 #[test]
+pub fn test_format_heading() {
+    let title = "Introducing the new cat";
+    assert_eq!(format_heading(title), "Introducing the new cat");
+
+    let title = "Introducing the zoo's new elephant";
+    assert_eq!(
+        format_heading(title),
+        "Introducing the zoo\\u2019s new elephant"
+    );
+
+    let title = "\"Introducing\" the zoo's new elephant";
+    assert_eq!(
+        format_heading(title),
+        "\\u201cIntroducing\\u201d the zoo\\u2019s new elephant"
+    );
+
+    let title = "It's not Right, but it's OK";
+    assert_eq!(
+        format_heading(title),
+        "It\\u2019s not Right, but it\\u2019s OK"
+    );
+}
+
+#[test]
 pub fn test_format_heading_widows() {
     let title = "Introducing the new cat";
     assert_eq!(
@@ -461,7 +485,7 @@ pub fn test_format_heading_widows() {
     let title = "\"Introducing\" the zoo's new elephant";
     assert_eq!(
         format_heading_widows(title),
-        "\\u201cIntroducing\\u201d the zoo\\u2018s new elephant"
+        "\\u201cIntroducing\\u201d the zoo\\u2019s new elephant"
     );
 }
 
