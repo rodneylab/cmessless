@@ -980,16 +980,10 @@ pub fn test_segment_emphasis_line() {
 #[test]
 pub fn test_slugify_title() {
     let title = "🏄🏽 All about Surf";
-    assert_eq!(
-        slugify_title(title),
-        String::from("surfer-skin-tone-4-all-about-surf")
-    );
+    assert_eq!(slugify_title(title), String::from("surfer-all-about-surf"));
 
     let title = "🏄🏽 All <img src=\"my-picture.jpg\" />about Surf";
-    assert_eq!(
-        slugify_title(title),
-        String::from("surfer-skin-tone-4-all-about-surf")
-    );
+    assert_eq!(slugify_title(title), String::from("surfer-all-about-surf"));
 
     let title = "What is $lib?";
     assert_eq!(slugify_title(title), String::from("what-is-lib"));
