@@ -997,6 +997,12 @@ import HowToDirection from '~components/HowTo/HowToDirection.svelte';",
             "import GatsbyNotMaintained from '~components/BlogPost/GatsbyNotMaintained.svelte';",
         ));
     }
+    if components.contains(&JSXComponentType::Image)
+        || components.contains(&JSXComponentType::Video)
+        || components.contains(&JSXComponentType::Tweet)
+    {
+        result.push(String::from("import { getEntry } from 'astro:content';"));
+    }
     if components.contains(&JSXComponentType::Image) {
         define_slug = true;
         image_data_imports.push(String::from("images"));
@@ -1014,7 +1020,11 @@ import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
     }
     if components.contains(&JSXComponentType::Image) {
         result.push(String::from(
-            "import type { ResponsiveImage } from '~types/image';",
+            "import type { NebulaPicture, PostPagePictures } from '~types/image';",
+        ));
+    } else if components.contains(&JSXComponentType::Video) {
+        result.push(String::from(
+            "import type { PostPagePictures } from '~types/image';",
         ));
     }
     if components.contains(&JSXComponentType::Questions) {
@@ -1042,46 +1052,74 @@ import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
     }
     if define_slug {
         result.push("import website from '~configuration/website';".to_string());
-        result.push("\nconst { nebulaUrl, newsletterUrl } = website;".to_string());
+        result.push("\nconst { newsletterUrl } = website;".to_string());
         result.push(format!("const slug = '{slug}';"));
-        result.push(format!(
-            "async function getImageData() {{
-  try {{
-    const response = await fetch(`${{nebulaUrl}}/post/{slug}.json`);
-    const {{ data }} = await response.json();
-    return data;
-  }} catch (error) {{
-    console.error(`Error getting image data: {slug}`);
-  }}
-}}"
-        ));
         if components.contains(&JSXComponentType::Image)
             && components.contains(&JSXComponentType::Video)
         {
             result.push(
-            "const { images, poster }: { images: ResponsiveImage[]; poster: string } = await getImageData();"
-                .to_string(),
-        );
+                "const postImagesContentCollectionEntry = await getEntry('post-images', slug);
+const {
+  data: { pagePictures, pictures },
+}: { data: { pagePictures: PostPagePictures; pictures: NebulaPicture[] } } =
+  postImagesContentCollectionEntry;
+const {
+  poster: { src: poster },
+} = pagePictures;"
+                    .to_string(),
+            );
             result.push(
-                "const imageProps = images.map((element, index) => ({ index, ...element, slug }));"
+                "const imageProps = pictures.map((element, index) => ({
+  index,
+  ...element,
+  slug,
+}));"
                     .to_string(),
             );
         } else if components.contains(&JSXComponentType::Image) {
             result.push(
-                "const { images }: { images: ResponsiveImage[] } = await getImageData();"
+                "const postImagesContentCollectionEntry = await getEntry('post-images', slug);
+const {
+  data: { pictures },
+}: { data: { pictures: NebulaPicture[] } } = postImagesContentCollectionEntry;"
                     .to_string(),
             );
             result.push(
-                "const imageProps = images.map((element, index) => ({ index, ...element, slug }));"
+                "const imageProps = pictures.map((element, index) => ({
+  index,
+  ...element,
+  slug,
+}));"
                     .to_string(),
             );
         } else if components.contains(&JSXComponentType::Video) {
-            result
-                .push("const {  poster }: {  poster: string } = await getImageData();".to_string());
+            result.push(
+                "const postImagesContentCollectionEntry = await getEntry('post-images', slug);
+const {
+  data: { pagePictures },
+}: { data: { pagePictures: PostPagePictures; } } =
+  postImagesContentCollectionEntry;
+const {
+  poster: { src: poster },
+} = pagePictures;"
+                    .to_string(),
+            );
         }
     } else {
         result.push("import website from '~configuration/website';".to_string());
         result.push("\nconst { newsletterUrl } = website;".to_string());
+    }
+    if components.contains(&JSXComponentType::Tweet) {
+        result.push(
+            "const pageImagesContentCollectionEntry = await getEntry('page-images', 'blog');
+const {
+  data: { pagePictures: blogPagePictures },
+}: { data: { pagePictures: PostPagePictures } } = pageImagesContentCollectionEntry;
+const {
+  twitterAvatar: { src: avatarSrc, placeholder: avatarPlaceholder },
+} = blogPagePictures;"
+                .to_string(),
+        );
     }
     for line in prepared_markup {
         result.push(line.to_string());
