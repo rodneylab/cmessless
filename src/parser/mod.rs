@@ -12,6 +12,7 @@ use crate::{
     utility::stack::Stack,
 };
 use deunicode::deunicode;
+use markup_fmt::{config::FormatOptions, format_text, Language};
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, tag_no_case, take_until},
@@ -26,7 +27,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     fs::File,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Cursor, Read, Seek, Write},
     path::Path,
     time::Instant,
 };
@@ -1677,22 +1678,59 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
         )
     };
 
-    for line in &astro_frontmatter {
-        outfile
-            .write_all(line.as_bytes())
-            .expect("[ ERROR ] Was not able to create the output file!");
-        outfile
-            .write_all(b"\n")
-            .expect("[ ERROR ] Was not able to create the output file!");
+    // Experimental formatting currently disabled
+    let format = false;
+
+    if format {
+        let mut cursor = Cursor::new(Vec::new());
+        for line in &astro_frontmatter {
+            cursor
+                .write_all(line.as_bytes())
+                .expect("[ ERROR ] Intermediate Astro buffer should have access to enough memory for markup.");
+        }
+        for line in &tokens {
+            cursor.write_all(line.as_bytes()).expect(
+                "[ ERROR ] Intermediate Astro buffer should have access to enough memory for markup."
+                );
+        }
+
+        let mut buffer = Vec::new();
+        cursor.rewind().unwrap();
+        cursor.read_to_end(&mut buffer).unwrap();
+
+        let options = FormatOptions::default();
+        let formatted = format_text(
+            std::str::from_utf8(&buffer)
+                .expect("[ ERROR ] Astro markup should not contain UTF-8 characters."),
+            Language::Astro,
+            &options,
+            |code, _| Ok::<_, std::convert::Infallible>(code.into()),
+        )
+        .unwrap_or_else(|_| {
+            panic!(
+            "[ ERROR ] Unformatted intermediate file `{}` should not contain syntactical errors.",
+            output_path.as_ref().display())
+        });
+        let _ = outfile.write_all(formatted.as_bytes());
+    } else {
+        for line in &astro_frontmatter {
+            outfile
+                .write_all(line.as_bytes())
+                .expect("[ ERROR ] Was not able to create the output file!");
+            outfile
+                .write_all(b"\n")
+                .expect("[ ERROR ] Was not able to create the output file!");
+        }
+        for line in &tokens {
+            outfile
+                .write_all(line.as_bytes())
+                .expect("[ ERROR ] Was not able to create the output file!");
+            outfile
+                .write_all(b"\n")
+                .expect("[ ERROR ] Was not able to create the output file!");
+        }
     }
-    for line in &tokens {
-        outfile
-            .write_all(line.as_bytes())
-            .expect("[ ERROR ] Was not able to create the output file!");
-        outfile
-            .write_all(b"\n")
-            .expect("[ ERROR ] Was not able to create the output file!");
-    }
+
     let duration = start.elapsed();
     let duration_milliseconds = duration.as_millis();
     let duration_microseconds = duration.as_micros() - (duration_milliseconds * 1000);
