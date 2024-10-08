@@ -18,7 +18,7 @@ impl<T> Stack<T> {
     }
 
     pub fn push(&mut self, element: T) {
-        self.structure.push(element)
+        self.structure.push(element);
     }
 
     pub fn len(&self) -> usize {

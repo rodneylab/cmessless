@@ -68,7 +68,7 @@ struct HowToStepComponent {
 impl HowToStepComponent {
     pub fn new() -> HowToStepComponent {
         HowToStepComponent {
-            name: "".to_string(),
+            name: String::new(),
             image: None,
             video: None,
             start: None,
@@ -210,21 +210,17 @@ impl HowToComponent {
                 result.push("        {".to_string());
                 result.push(format!("          name: \"{}\",", step.name));
                 result.push(format!("          position: {},", step_position + 1));
-                match &step.image {
-                    Some(value) => result.push(format!("          image: \"{value}\",")),
-                    None => {}
+                if let Some(value) = &step.image {
+                    result.push(format!("          image: \"{value}\","));
                 }
-                match &step.video {
-                    Some(value) => result.push(format!("          video: \"{value}\",")),
-                    None => {}
+                if let Some(value) = &step.video {
+                    result.push(format!("          video: \"{value}\","));
                 }
-                match &step.start {
-                    Some(value) => result.push(format!("          start: {value},")),
-                    None => {}
+                if let Some(value) = &step.start {
+                    result.push(format!("          start: {value},"));
                 }
-                match &step.end {
-                    Some(value) => result.push(format!("          end: {value},")),
-                    None => {}
+                if let Some(value) = &step.end {
+                    result.push(format!("          end: {value},"));
                 }
                 result.push("          directions: [".to_string());
                 for (direction_position, direction) in step.directions.iter().enumerate() {
@@ -268,7 +264,7 @@ impl JSXComponentRegister {
         self.components.pop()
     }
     pub fn push(&mut self, component: JSXComponentType) {
-        self.components.push(component)
+        self.components.push(component);
     }
 
     pub fn add_how_to_section(&mut self, name: &str) -> usize {
@@ -287,7 +283,7 @@ impl JSXComponentRegister {
     }
 
     pub fn add_how_to_step_name(&mut self, name: &str) {
-        let _ = &self
+        let () = &self
             .how_to
             .as_mut()
             .expect("Error adding How to Step Name")
@@ -295,7 +291,7 @@ impl JSXComponentRegister {
     }
 
     pub fn add_how_to_step_image(&mut self, image: &str) {
-        let _ = &self
+        let () = &self
             .how_to
             .as_mut()
             .expect("Error adding How to Step Name")
@@ -303,7 +299,7 @@ impl JSXComponentRegister {
     }
 
     pub fn add_how_to_step_video(&mut self, video: &str) {
-        let _ = &self
+        let () = &self
             .how_to
             .as_mut()
             .expect("Error adding How to Step Name")
@@ -314,7 +310,7 @@ impl JSXComponentRegister {
         let start_int: u64 = start
             .parse()
             .expect("Error parsing HowTo step video start time");
-        let _ = &self
+        let () = &self
             .how_to
             .as_mut()
             .expect("Error adding HowTo step video start time")
@@ -325,7 +321,7 @@ impl JSXComponentRegister {
         let end_int: u64 = end
             .parse()
             .expect("Error parsing HowTo step video end time");
-        let _ = &self
+        let () = &self
             .how_to
             .as_mut()
             .expect("Error adding HowTo step video end time")
@@ -340,19 +336,16 @@ impl JSXComponentRegister {
     }
 
     pub fn insert_prop(&mut self, key: &str, value: &str) {
-        match &self.how_to {
-            Some(_) => {
-                let _ = &self
-                    .how_to
-                    .as_mut()
-                    .expect("Error inserting How to Prop")
-                    .insert_prop(key, value);
-            }
-            None => {
-                self.how_to = Some(HowToComponent::new());
-                self.insert_prop(key, value);
-            }
-        };
+        if self.how_to.is_some() {
+            let () = &self
+                .how_to
+                .as_mut()
+                .expect("Error inserting How to Prop")
+                .insert_prop(key, value);
+        } else {
+            self.how_to = Some(HowToComponent::new());
+            self.insert_prop(key, value);
+        }
     }
 
     pub fn how_to(&self) -> Option<&HowToComponent> {
@@ -450,10 +443,10 @@ fn form_jsx_component_last_line<'a>(
     line: &'a str,
     component_identifier: &'a str,
 ) -> IResult<&'a str, (String, HTMLTagType, usize)> {
-    let (_remaining_line, (component_name, _attributes, tag_type)) = parse_closing_html_tag(line)?;
+    let (remaining_line, (component_name, _attributes, tag_type)) = parse_closing_html_tag(line)?;
     all_consuming(tag(component_identifier))(component_name)?; // check names match
     match tag_type {
-        HTMLTagType::Closing => Ok((_remaining_line, (line.to_string(), tag_type, 0))),
+        HTMLTagType::Closing => Ok((remaining_line, (line.to_string(), tag_type, 0))),
         HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
             Err(Err::Error(Error::new(line, ErrorKind::Tag)))
         }
@@ -860,7 +853,9 @@ pub fn parse_open_jsx_block(
     match open_jsx_component_type {
         Some(JSXComponentType::HowToOpening) => match form_how_to_component_opening_line(line) {
             Ok((_, (line, attributes, line_type, level))) => {
-                if !line.is_empty() {
+                if line.is_empty() {
+                    None
+                } else {
                     let (_, attributes_vector) = parse_html_tag_attributes(attributes)
                         .unwrap_or_else(|_| {
                             panic!("[ ERROR ] Unable to parse HowTo component props: {line}")
@@ -869,28 +864,26 @@ pub fn parse_open_jsx_block(
                         open_jsx_component_register.insert_prop(key, value);
                     }
                     Some((line, line_type, level))
-                } else {
-                    None
                 }
             }
             Err(_) => Some((line.to_string(), LineType::HowToOpening, 0)),
         },
         Some(JSXComponentType::PollOpening) => match form_poll_component_opening_line(line) {
             Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
+                if line.is_empty() {
                     None
+                } else {
+                    Some((line, line_type, level))
                 }
             }
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
         },
         Some(JSXComponentType::VideoOpening) => match form_video_component_opening_line(line) {
             Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
+                if line.is_empty() {
                     None
+                } else {
+                    Some((line, line_type, level))
                 }
             }
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
@@ -898,10 +891,10 @@ pub fn parse_open_jsx_block(
         Some(JSXComponentType::FencedCodeBlock) => {
             match alt((form_fenced_code_block_last_line,))(line) {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((escape_code(line), LineType::FencedCodeBlockOpen, 0)),
@@ -948,10 +941,10 @@ pub fn parse_open_jsx_block(
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::HowToOpen, 0)),
@@ -1048,10 +1041,10 @@ pub fn parse_open_jsx_block(
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::HowToSectionOpen, 0)),
@@ -1145,10 +1138,10 @@ pub fn parse_open_jsx_block(
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::HowToStepOpen, 0)),
@@ -1198,10 +1191,10 @@ pub fn parse_open_jsx_block(
                 ))(line)
                 {
                     Ok((_, (line, line_type, level))) => {
-                        if !line.is_empty() {
-                            Some((line, line_type, level))
-                        } else {
+                        if line.is_empty() {
                             None
+                        } else {
+                            Some((line, line_type, level))
                         }
                     }
                     Err(_) => Some((line.to_string(), LineType::HowToDirectionOpen, 0)),
@@ -1219,10 +1212,10 @@ pub fn parse_open_jsx_block(
             ))(line)
             {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
@@ -1230,24 +1223,21 @@ pub fn parse_open_jsx_block(
         }
         None => match form_how_to_component_first_line(line) {
             Ok((_, (line, attributes, line_type, level))) => {
-                if !line.is_empty() {
+                if line.is_empty() {
+                    None
+                } else {
                     let (_, attributes_vector) = parse_html_tag_attributes(attributes)
                         .unwrap_or_else(|_| {
                             panic!("[ ERROR ] Unable to parse HowTo component props: {line}")
                         });
                     let how_to = open_jsx_component_register.how_to_mut();
-                    match how_to {
-                        Some(how_to_value) => {
-                            for (key, value) in attributes_vector {
-                                how_to_value.insert_prop(key, value);
-                            }
+                    if let Some(how_to_value) = how_to {
+                        for (key, value) in attributes_vector {
+                            how_to_value.insert_prop(key, value);
                         }
-                        None => {}
-                    };
+                    }
 
                     Some((line, line_type, level))
-                } else {
-                    None
                 }
             }
             Err(_) => None,

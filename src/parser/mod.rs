@@ -180,11 +180,11 @@ fn format_heading_widows(heading: &str) -> String {
 }
 
 fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
-    let heading = heading.into();
     fn is_replace_character(c: char) -> bool {
         c == '-' || c == '\'' || c == '"'
     }
 
+    let heading = heading.into();
     let first = heading.find(is_replace_character);
     if let Some(first) = first {
         let (mut result, rest) = match first {
@@ -217,22 +217,22 @@ fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
                 '\'' => {
                     if preceded_by_space {
                         preceded_by_space = false;
-                        result.push_str("\\u2018")
+                        result.push_str("\\u2018");
                     } else {
-                        result.push_str("\\u2019")
+                        result.push_str("\\u2019");
                     }
                 }
                 '"' => {
                     if preceded_by_space {
                         preceded_by_space = false;
-                        result.push_str("\\u201c")
+                        result.push_str("\\u201c");
                     } else {
-                        result.push_str("\\u201d")
+                        result.push_str("\\u201d");
                     }
                 }
                 _ => {
                     preceded_by_space = false;
-                    result.push(c)
+                    result.push(c);
                 }
             }
         }
@@ -243,31 +243,30 @@ fn format_heading<'a, I: Into<Cow<'a, str>>>(heading: I) -> Cow<'a, str> {
 }
 
 fn slugify_title(title: &str) -> String {
-    match remove_html_tags(title) {
-        Ok((final_value, initial_value)) => format!(
+    if let Ok((final_value, initial_value)) = remove_html_tags(title) {
+        format!(
             "{}{}",
             slugify_title(initial_value),
             slugify_title(final_value)
-        ),
-        Err(_) => {
-            let deunicoded_title = deunicode(title);
-            let mut result = String::with_capacity(deunicoded_title.len());
-            let mut last_was_replaced = true;
-            let remove_characters = "?'`:[]()";
-            let replace_characters = " -/.,$"; // include '-' here to avoid "--" in result
-            for chars in deunicoded_title.chars() {
-                if replace_characters.contains(chars) {
-                    if !last_was_replaced {
-                        last_was_replaced = true;
-                        result.push('-');
-                    }
-                } else if !remove_characters.contains(chars) {
-                    last_was_replaced = false;
-                    result.push_str(&chars.to_lowercase().to_string());
+        )
+    } else {
+        let deunicoded_title = deunicode(title);
+        let mut result = String::with_capacity(deunicoded_title.len());
+        let mut last_was_replaced = true;
+        let remove_characters = "?'`:[]()";
+        let replace_characters = " -/.,$"; // include '-' here to avoid "--" in result
+        for chars in deunicoded_title.chars() {
+            if replace_characters.contains(chars) {
+                if !last_was_replaced {
+                    last_was_replaced = true;
+                    result.push('-');
                 }
+            } else if !remove_characters.contains(chars) {
+                last_was_replaced = false;
+                result.push_str(&chars.to_lowercase().to_string());
             }
-            result
         }
+        result
     }
 }
 
@@ -276,10 +275,9 @@ fn parse_author_name_from_cargo_pkg_authors(cargo_pkg_authors: &str) -> IResult<
 }
 
 pub fn author_name_from_cargo_pkg_authors() -> &'static str {
-    match parse_author_name_from_cargo_pkg_authors(env!("CARGO_PKG_AUTHORS")) {
-        Ok((_, result)) => result,
-        Err(_) => panic!("[ ERROR ] Authors does not seem to be defined!"),
-    }
+    let (_, result) = parse_author_name_from_cargo_pkg_authors(env!("CARGO_PKG_AUTHORS"))
+        .expect("[ ERROR ] Authors should be defined!");
+    result
 }
 
 // consumes delimiter
@@ -328,18 +326,15 @@ fn parse_opening_html_tag_start(line: &str) -> IResult<&str, (&str, &str, HTMLTa
 }
 
 fn parse_opening_html_tag_end(line: &str) -> IResult<&str, (&str, HTMLTagType)> {
-    match alt((
+    if let Ok((remaining_line, tag_attributes)) = alt((
         delimited(multispace0, parse_html_tag_attributes_str, tag(">")),
         terminated(multispace0, tag(">")),
     ))(line)
     {
-        Ok((remaining_line, tag_attributes)) => {
-            Ok((remaining_line, (tag_attributes, HTMLTagType::Opening)))
-        }
-        Err(_) => {
-            let (_, attributes) = preceded(multispace0, rest)(line)?;
-            Ok(("", (attributes, HTMLTagType::OpeningStart)))
-        }
+        Ok((remaining_line, (tag_attributes, HTMLTagType::Opening)))
+    } else {
+        let (_, attributes) = preceded(multispace0, rest)(line)?;
+        Ok(("", (attributes, HTMLTagType::OpeningStart)))
     }
 }
 
@@ -824,9 +819,8 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
             "*" => alt((form_strong_emphasis_line, form_emphasis_line))(line_from_tag),
             _ => return Ok(("", line.to_string())),
         };
-        let (initial_segment, final_segment) = match parsed_result {
-            Ok((value_1, value_2)) => (value_2, value_1),
-            Err(_) => return Ok(("", line.to_string())),
+        let Ok((final_segment, initial_segment)) = parsed_result else {
+            return Ok(("", line.to_string()));
         };
         let (_, final_final_segment) = parse_inline_wrap_text(final_segment)?;
         let line_before_tag = &line[..first_tag];
@@ -955,13 +949,13 @@ fn form_inline_wrap_text(line: &str) -> IResult<&str, (String, LineType, usize)>
     } else {
         parsed_line
     };
-    if !parsed_line.is_empty() {
+    if parsed_line.is_empty() {
+        Ok(("", (String::new(), LineType::Paragraph, 0)))
+    } else {
         Ok((
             "",
             (format!("<p>{parsed_line}</p>"), LineType::Paragraph, 0),
         ))
-    } else {
-        Ok(("", (String::new(), LineType::Paragraph, 0)))
     }
 }
 
@@ -1147,11 +1141,11 @@ fn parse_open_markdown_block(
     match open_markdown_block {
         Some(MarkdownBlock::OrderedList) => match form_ordered_list_line(line) {
             Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
+                if line.is_empty() {
+                    Some((String::from("</ol>"), LineType::OrderedList, level))
+                } else {
                     let markup = format!("</li>{line}");
                     Some((markup, line_type, level))
-                } else {
-                    Some((String::from("</ol>"), LineType::OrderedList, level))
                 }
             }
             Err(_) => None,
@@ -1167,20 +1161,20 @@ fn parse_open_html_block(
     match open_html_block_elements {
         Some(HTMLBlockElementType::Div) => match form_html_block_element_last_line(line) {
             Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
+                if line.is_empty() {
                     None
+                } else {
+                    Some((line, line_type, level))
                 }
             }
             Err(_) => Some((line.to_string(), LineType::HTMLDivBlockOpen, 0)),
         },
         Some(HTMLBlockElementType::Figure) => match form_html_block_element_last_line(line) {
             Ok((_, (line, line_type, level))) => {
-                if !line.is_empty() {
-                    Some((line, line_type, level))
-                } else {
+                if line.is_empty() {
                     None
+                } else {
+                    Some((line, line_type, level))
                 }
             }
             Err(_) => Some((line.to_string(), LineType::HTMLFigureBlockOpen, 0)),
@@ -1188,10 +1182,10 @@ fn parse_open_html_block(
         Some(HTMLBlockElementType::DescriptionList) => {
             match form_html_block_element_last_line(line) {
                 Ok((_, (line, line_type, level))) => {
-                    if !line.is_empty() {
-                        Some((line, line_type, level))
-                    } else {
+                    if line.is_empty() {
                         None
+                    } else {
+                        Some((line, line_type, level))
                     }
                 }
                 Err(_) => Some((line.to_string(), LineType::HTMLDescriptionListOpen, 0)),
@@ -1261,10 +1255,10 @@ fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
     ))(line)
     {
         Ok((_, (line, line_type, level))) => {
-            if !line.is_empty() {
-                Some((line, line_type, level))
-            } else {
+            if line.is_empty() {
                 None
+            } else {
+                Some((line, line_type, level))
             }
         }
         Err(_) => None,
@@ -1392,7 +1386,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                         tokens.push(format!("</ol>\n{list_item_indentation}{line}"));
                         open_markdown_block_stack.pop();
                     }
-                    current_indentation = indentation
+                    current_indentation = indentation;
                 }
                 LineType::UnorderedListItem => {
                     if open_lists.is_empty() {
@@ -1413,7 +1407,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                         let list_item_indentation = " ".repeat(2 * open_lists.len());
                         tokens.push(format!("</ul>\n{list_item_indentation}{line}"));
                     }
-                    current_indentation = indentation
+                    current_indentation = indentation;
                 }
                 LineType::Poll => {
                     present_jsx_component_types.insert(JSXComponentType::Poll);
@@ -1425,12 +1419,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                     open_jsx_component_register.pop();
                     tokens.push(line);
                 }
-                LineType::FencedCodeBlock => {
-                    present_jsx_component_types.insert(JSXComponentType::CodeFragment);
-                    open_jsx_component_register.pop();
-                    tokens.push(line);
-                }
-                LineType::CodeFragment => {
+                LineType::FencedCodeBlock | LineType::CodeFragment => {
                     present_jsx_component_types.insert(JSXComponentType::CodeFragment);
                     open_jsx_component_register.pop();
                     tokens.push(line);
@@ -1475,23 +1464,11 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                     present_jsx_component_types.insert(JSXComponentType::Tweet);
                     tokens.push(line);
                 }
-                LineType::HTMLBlockLevelComment => {
-                    open_html_block_element_stack.pop();
-                    tokens.push(line);
-                }
-                LineType::HTMLDescriptionList => {
-                    open_html_block_element_stack.pop();
-                    tokens.push(line);
-                }
-                LineType::HTMLDivBlock => {
-                    open_html_block_element_stack.pop();
-                    tokens.push(line);
-                }
-                LineType::HTMLFigureBlock => {
-                    open_html_block_element_stack.pop();
-                    tokens.push(line);
-                }
-                LineType::HTMLTableBody => {
+                LineType::HTMLBlockLevelComment
+                | LineType::HTMLDescriptionList
+                | LineType::HTMLDivBlock
+                | LineType::HTMLFigureBlock
+                | LineType::HTMLTableBody => {
                     open_html_block_element_stack.pop();
                     tokens.push(line);
                 }
@@ -1693,12 +1670,11 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
         println! {"\n"};
     }
 
-    let mut outfile = match File::create(output_path) {
-        Ok(value) => value,
-        Err(_) => panic!(
+    let Ok(mut outfile) = File::create(output_path) else {
+        panic!(
             "[ ERROR ] Was not able to create the output file: {:?}!",
             output_path.as_ref().display().to_string()
-        ),
+        )
     };
 
     for line in &astro_frontmatter {
