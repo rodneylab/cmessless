@@ -86,7 +86,7 @@ async fn debounce_watch<P1: AsRef<Path>, P2: AsRef<Path>>(
             Ok(_) => {
                 parse_mdx_file(&mdx_path, output_path, verbose);
             }
-            Err(e) => eprintln!("Something went wrong: {:?}", e),
+            Err(e) => eprintln!("Something went wrong: {e:?}"),
         }
     }
 }
@@ -151,7 +151,7 @@ fn output_path_from_relative_input<P1: AsRef<Path>, P2: AsRef<Path>>(
 /**
  * watch multiple input paths for changes, input paths need to contain a '/./'
  * pattern to mark the relative part of the path.  To get the output path, we place the relative
- * part (after the '/./') on the end of the output_path_root, passed in. Output will have a .astro
+ * part (after the '/./') on the end of the `output_path_root`, passed in. Output will have a .astro
  * extension.  Multiple paths may be passed in, but perhaps only one or two input files eveer get
  * updated, so to save working out the outpaths for unused paths, a hash map caches the values.
  */
@@ -181,7 +181,7 @@ async fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
     for events in rx {
         match events {
             Ok(event) => {
-                for individual_event in event.iter() {
+                for individual_event in &event {
                     let DebouncedEvent { path, .. } = individual_event;
 
                     if let Some((index, _)) = canonicalized_paths
@@ -190,22 +190,21 @@ async fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
                         .find(|(_, val)| val == &path)
                     {
                         let path_as_string = path.to_str().unwrap();
-                        match output_paths_map.get(path_as_string) {
-                            Some(value) => parse_mdx_file(path, &value, verbose),
-                            None => {
-                                let output_path_result = output_path_from_relative_input(
-                                    &output_path_root,
-                                    &mdx_paths[index],
-                                );
-                                parse_mdx_file(path, &output_path_result, verbose);
-                                output_paths_map
-                                    .insert((&path_as_string).to_string(), output_path_result);
-                            }
-                        };
+                        if let Some(value) = output_paths_map.get(path_as_string) {
+                            parse_mdx_file(path, &value, verbose);
+                        } else {
+                            let output_path_result = output_path_from_relative_input(
+                                &output_path_root,
+                                &mdx_paths[index],
+                            );
+                            parse_mdx_file(path, &output_path_result, verbose);
+                            output_paths_map
+                                .insert((path_as_string).to_string(), output_path_result);
+                        }
                     };
                 }
             }
-            Err(e) => eprintln!("Something went wrong: {:?}", e),
+            Err(e) => eprintln!("Something went wrong: {e:?}"),
         }
     }
 }
@@ -251,7 +250,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = &Cli::parse();
 
     let inputs = if io::stdin().is_terminal() {
-        cli.path.to_vec()
+        cli.path.clone()
     } else {
         get_piped_input()
     };
@@ -280,13 +279,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             let stdout = io::stdout();
             let mut stdout_handle = io::BufWriter::new(stdout);
-            inputs.iter().for_each(|val| {
+            for val in &inputs {
                 let absolute_output_path = output_path_from_relative_input(&cli.output, val);
                 if check_file_modified(val, &absolute_output_path) {
                     writeln!(stdout_handle, "{}", val.display())
                         .expect("Unable to write to stdout");
                 }
-            });
+            }
             stdout_handle.flush().expect("Unable to write to stdout");
         }
         return Ok(());
@@ -302,10 +301,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if cli.relative {
-        inputs.iter().for_each(|val| {
+        for val in &inputs {
             let absolute_output_path = output_path_from_relative_input(&cli.output, val);
             parse_mdx_file(val, &absolute_output_path, cli.verbose);
-        })
+        }
     } else {
         parse_mdx_file(&inputs[0], &cli.output, cli.verbose);
     }

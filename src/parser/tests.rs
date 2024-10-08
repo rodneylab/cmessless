@@ -245,7 +245,7 @@ pub fn test_form_inline_wrap_text() {
     let mdx_line = "";
     assert_eq!(
         form_inline_wrap_text(mdx_line),
-        Ok(("", (String::from(""), LineType::Paragraph, 0)))
+        Ok(("", (String::new(), LineType::Paragraph, 0)))
     );
 
     // adds paragraph tags for non-empty line
