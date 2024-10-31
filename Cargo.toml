@@ -8,8 +8,8 @@ license = "BSD-3-Clause"
 repository = "https://github.com/rodneylab/cmessless"
 description = "A markdown parser to output Astro markup."
 
-# IsTerminal, introduced in Rust 1.70 used in main.rs
-rust-version = "1.70"
+# notify 7.0.0 raises msrv to 1.72
+rust-version = "1.72"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,9 +19,9 @@ deunicode = "1.6.0"
 markup_fmt = "0.13.1"
 miette = "7.1.0"
 nom = { version = "7.1.3", features = ["alloc"] }
-notify = "6.1.1"
-notify-debouncer-mini = { version = "0.4.1", default-features = false }
-tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
+notify = "7.0.0"
+notify-debouncer-mini = { version = "0.5.0", default-features = false }
+tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 strip = "debuginfo"
