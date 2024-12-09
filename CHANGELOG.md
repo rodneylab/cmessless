@@ -31,7 +31,7 @@
 - **dependencies**: 💫 update crates
 - 💫 update usage of Astro directives
 - **dependencies**: 💫 update crates
-- 💫 update HowTo ouptut
+- 💫 update HowTo output
 - 💫 update div handling
 - **dependencies**: 💫 update crate
 - 💫 upgrade to clap version 4
@@ -63,7 +63,7 @@
 - 🐞 address potential issue with oredered lisr markup generation
 - 💫 simplify ordered list markup generation from Markdown
 - 💫 update Heading related markup
-- 💫 output headings wiht component to facilitate anchor link code
+- 💫 output headings with component to facilitate anchor link code
 - 💫 update heading slugify
 - 💫 add heading formatting
 - 💫 update escaping of inline code fragments
@@ -119,7 +119,7 @@
 - 💫 update status message
 - 🐞 address issue parsing non-acnhor tags commencing a
 - 💫 add parsig of first line number for Markdown fenced code block
-- 💫 add panic if anchor whithout href attribute is encountered
+- 💫 add panic if anchor without href attribute is encountered
 - 💫 add logic for Markdown frontmatter recognition
 - **dependencies**: 💫 update crates
 - 🧑🏽 improve ux when using cli switches
@@ -134,7 +134,7 @@
 - 🏄🏽 update to facilitate parsing of blocks going forwards
 - 🏄🏽 make intesnt int parse inline wrap text clearer
 - 🏄🏽 refator parser module to simplift mdx parsing function
-- 🏄🏽 replace cutsom stack components in parser with generic one
+- 🏄🏽 replace custom stack components in parser with generic one
 - 🏄🏽 simplify mdx file parse function
 - 🏄🏽 simplify mdx file parse function
 - 🏄🏽 simplify cli watch mode code

@@ -643,18 +643,18 @@ pub fn form_video_component_first_line(line: &str) -> IResult<&str, (String, Lin
 pub fn form_how_to_component_opening_line(
     line: &str,
 ) -> IResult<&str, (String, &str, LineType, usize)> {
-    let (remaining_line, (markup, atrributes, tag_type, indentation)) =
+    let (remaining_line, (markup, attributes, tag_type, indentation)) =
         form_jsx_component_opening_line(line)?;
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::SelfClosing => Ok((
             remaining_line,
-            (markup, atrributes, LineType::HowToOpen, indentation),
+            (markup, attributes, LineType::HowToOpen, indentation),
         )),
         _ => Ok((
             "",
             (
                 String::from(line),
-                atrributes,
+                attributes,
                 LineType::HowToOpening,
                 indentation,
             ),
@@ -665,18 +665,18 @@ pub fn form_how_to_component_opening_line(
 pub fn form_how_to_section_component_opening_line(
     line: &str,
 ) -> IResult<&str, (String, &str, LineType, usize)> {
-    let (remaining_line, (markup, atrributes, tag_type, indentation)) =
+    let (remaining_line, (markup, attributes, tag_type, indentation)) =
         form_jsx_component_opening_line(line)?;
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::SelfClosing => Ok((
             remaining_line,
-            (markup, atrributes, LineType::HowToSectionOpen, indentation),
+            (markup, attributes, LineType::HowToSectionOpen, indentation),
         )),
         _ => Ok((
             "",
             (
                 String::from(line),
-                atrributes,
+                attributes,
                 LineType::HowToSectionOpening,
                 indentation,
             ),
@@ -687,18 +687,18 @@ pub fn form_how_to_section_component_opening_line(
 pub fn form_how_to_step_component_opening_line(
     line: &str,
 ) -> IResult<&str, (String, &str, LineType, usize)> {
-    let (remaining_line, (markup, atrributes, tag_type, indentation)) =
+    let (remaining_line, (markup, attributes, tag_type, indentation)) =
         form_jsx_component_opening_line(line)?;
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::SelfClosing => Ok((
             remaining_line,
-            (markup, atrributes, LineType::HowToStepOpen, indentation),
+            (markup, attributes, LineType::HowToStepOpen, indentation),
         )),
         _ => Ok((
             "",
             (
                 String::from(line),
-                atrributes,
+                attributes,
                 LineType::HowToStepOpening,
                 indentation,
             ),
@@ -709,14 +709,14 @@ pub fn form_how_to_step_component_opening_line(
 pub fn form_how_to_direction_component_opening_line(
     line: &str,
 ) -> IResult<&str, (String, &str, LineType, usize)> {
-    let (remaining_line, (markup, atrributes, tag_type, indentation)) =
+    let (remaining_line, (markup, attributes, tag_type, indentation)) =
         form_jsx_component_opening_line(line)?;
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::SelfClosing => Ok((
             remaining_line,
             (
                 markup,
-                atrributes,
+                attributes,
                 LineType::HowToDirectionOpen,
                 indentation,
             ),
@@ -725,7 +725,7 @@ pub fn form_how_to_direction_component_opening_line(
             "",
             (
                 String::from(line),
-                atrributes,
+                attributes,
                 LineType::HowToDirectionOpening,
                 indentation,
             ),
