@@ -210,7 +210,7 @@ async fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
 }
 
 /** Check if an input file has been modified since its output was created. Return true when not able
- * to detemine modified time of either file
+ * to determine modified time of either file
  */
 fn check_file_modified<P1: AsRef<Path>, P2: AsRef<Path>>(
     input_path: &P1,
