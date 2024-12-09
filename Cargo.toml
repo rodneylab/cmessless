@@ -16,7 +16,7 @@ rust-version = "1.72"
 [dependencies]
 clap = { version = "4.5.21", features = ["derive"] }
 deunicode = "1.6.0"
-markup_fmt = "0.15.1"
+markup_fmt = "0.18.0"
 miette = "7.1.0"
 nom = { version = "7.1.3", features = ["alloc"] }
 notify = "7.0.0"
