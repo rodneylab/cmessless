@@ -17,7 +17,7 @@ use nom::{
     combinator::{all_consuming, map, rest, value},
     error::{Error, ErrorKind},
     sequence::{delimited, preceded, terminated},
-    Err, IResult,
+    Err, IResult, Parser,
 };
 use std::collections::HashMap;
 
@@ -370,7 +370,7 @@ fn parse_jsx_component<'a>(
 ) -> IResult<&'a str, &'a str> {
     let delimiter = &mut String::from("<");
     delimiter.push_str(component_identifier);
-    let result = delimited(tag(delimiter.as_str()), take_until("/>"), tag("/>"))(line);
+    let result = delimited(tag(delimiter.as_str()), take_until("/>"), tag("/>")).parse(line);
     result
 }
 
@@ -393,7 +393,8 @@ fn parse_jsx_component_first_line<'a>(
             (line, &JSXTagType::Opened),
             preceded(tag(left_delimiter.as_str()), rest),
         ),
-    ))(line)?;
+    ))
+    .parse(line)?;
     Ok(result)
 }
 
@@ -415,8 +416,9 @@ fn form_jsx_component_first_line<'a>(
         parse_self_closing_html_tag,
         parse_opening_html_tag,
         parse_opening_html_tag_start,
-    ))(line)?;
-    all_consuming(tag(component_identifier))(component_name)?; // check names match
+    ))
+    .parse(line)?;
+    all_consuming(tag(component_identifier)).parse(component_name)?; // check names match
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
             Ok((remaining_line, (line.to_string(), attributes, tag_type, 0)))
@@ -430,7 +432,7 @@ fn form_jsx_component_opening_line(
     line: &str,
 ) -> IResult<&str, (String, &str, HTMLTagType, usize)> {
     let (remaining_line, (attributes, tag_type)) =
-        alt((parse_self_closing_html_tag_end, parse_opening_html_tag_end))(line)?;
+        alt((parse_self_closing_html_tag_end, parse_opening_html_tag_end)).parse(line)?;
     match tag_type {
         HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
             Ok((remaining_line, (line.to_string(), attributes, tag_type, 0)))
@@ -444,7 +446,7 @@ fn form_jsx_component_last_line<'a>(
     component_identifier: &'a str,
 ) -> IResult<&'a str, (String, HTMLTagType, usize)> {
     let (remaining_line, (component_name, _attributes, tag_type)) = parse_closing_html_tag(line)?;
-    all_consuming(tag(component_identifier))(component_name)?; // check names match
+    all_consuming(tag(component_identifier)).parse(component_name)?; // check names match
     match tag_type {
         HTMLTagType::Closing => Ok((remaining_line, (line.to_string(), tag_type, 0))),
         HTMLTagType::Opening | HTMLTagType::OpeningStart | HTMLTagType::SelfClosing => {
@@ -740,7 +742,8 @@ pub fn form_poll_component_opening_line(line: &str) -> IResult<&str, (String, Li
             LineType::PollOpen
         }),
         map(rest, |_| LineType::PollOpening),
-    ))(line)?;
+    ))
+    .parse(line)?;
     Ok(("", (line.to_string(), line_type, 0)))
 }
 
@@ -889,7 +892,7 @@ pub fn parse_open_jsx_block(
             Err(_) => Some((line.to_string(), LineType::JSXComponent, 0)),
         },
         Some(JSXComponentType::FencedCodeBlock) => {
-            match alt((form_fenced_code_block_last_line,))(line) {
+            match alt((form_fenced_code_block_last_line,)).parse(line) {
                 Ok((_, (line, line_type, level))) => {
                     if line.is_empty() {
                         None
@@ -938,7 +941,8 @@ pub fn parse_open_jsx_block(
                 form_fenced_code_block_first_line,
                 form_video_component_first_line,
                 form_how_to_component_last_line,
-            ))(line)
+            ))
+            .parse(line)
             {
                 Ok((_, (line, line_type, level))) => {
                     if line.is_empty() {
@@ -1038,7 +1042,8 @@ pub fn parse_open_jsx_block(
                 form_fenced_code_block_first_line,
                 form_video_component_first_line,
                 form_how_to_section_component_last_line,
-            ))(line)
+            ))
+            .parse(line)
             {
                 Ok((_, (line, line_type, level))) => {
                     if line.is_empty() {
@@ -1135,7 +1140,8 @@ pub fn parse_open_jsx_block(
                 form_fenced_code_block_first_line,
                 form_video_component_first_line,
                 form_how_to_step_component_last_line,
-            ))(line)
+            ))
+            .parse(line)
             {
                 Ok((_, (line, line_type, level))) => {
                     if line.is_empty() {
@@ -1188,7 +1194,8 @@ pub fn parse_open_jsx_block(
                 Err(_) => match alt((
                     form_fenced_code_block_first_line,
                     form_video_component_first_line,
-                ))(line)
+                ))
+                .parse(line)
                 {
                     Ok((_, (line, line_type, level))) => {
                         if line.is_empty() {
@@ -1209,7 +1216,8 @@ pub fn parse_open_jsx_block(
                 form_how_to_step_component_last_line,
                 form_how_to_section_component_last_line,
                 form_how_to_component_last_line,
-            ))(line)
+            ))
+            .parse(line)
             {
                 Ok((_, (line, line_type, level))) => {
                     if line.is_empty() {
