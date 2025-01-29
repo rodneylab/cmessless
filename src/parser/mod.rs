@@ -20,8 +20,8 @@ use nom::{
     combinator::{opt, peek, recognize, rest, value},
     error::{Error, ErrorKind},
     multi::{many0, many0_count, many1, many1_count},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    Err, IResult,
+    sequence::{delimited, pair, preceded, separated_pair, terminated},
+    Err, IResult, Parser,
 };
 use std::{
     borrow::Cow,
@@ -129,7 +129,7 @@ enum TableAlign {
 
 #[allow(dead_code)]
 fn discard_leading_whitespace(line: &str) -> IResult<&str, &str> {
-    preceded(multispace0, rest)(line)
+    preceded(multispace0, rest).parse(line)
 }
 
 fn escape_code(line: &str) -> String {
@@ -286,7 +286,7 @@ fn parse_up_to_inline_wrap_segment<'a>(
     line: &'a str,
     delimiter: &'a str,
 ) -> IResult<&'a str, (&'a str, &'a str)> {
-    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
+    separated_pair(take_until(delimiter), tag(delimiter), rest).parse(line)
 }
 
 fn parse_html_tag_attributes_str(line: &str) -> IResult<&str, &str> {
@@ -295,13 +295,13 @@ fn parse_html_tag_attributes_str(line: &str) -> IResult<&str, &str> {
 
 fn parse_html_tag_content(line: &str) -> IResult<&str, (&str, &str)> {
     let (remainder, tag_content) = is_not(">/")(line)?;
-    let (attributes, (tag_name, _space)) = pair(alphanumeric1, multispace0)(tag_content)?;
+    let (attributes, (tag_name, _space)) = pair(alphanumeric1, multispace0).parse(tag_content)?;
     Ok((remainder, (tag_name, attributes)))
 }
 
 fn parse_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
     let (remaining_line, (tag_name, tag_attributes)) =
-        delimited(tag("</"), parse_html_tag_content, tag(">"))(line)?;
+        delimited(tag("</"), parse_html_tag_content, tag(">")).parse(line)?;
     Ok((
         remaining_line,
         (tag_name, tag_attributes, HTMLTagType::Closing),
@@ -310,7 +310,7 @@ fn parse_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)
 
 fn parse_opening_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
     let (remaining_line, (tag_name, tag_attributes)) =
-        delimited(tag("<"), parse_html_tag_content, tag(">"))(line)?;
+        delimited(tag("<"), parse_html_tag_content, tag(">")).parse(line)?;
     Ok((
         remaining_line,
         (tag_name, tag_attributes, HTMLTagType::Opening),
@@ -319,7 +319,7 @@ fn parse_opening_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)
 
 fn parse_opening_html_tag_start(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
     let (remaining_line, (tag_name, tag_attributes)) =
-        preceded(tag("<"), parse_html_tag_content)(line)?;
+        preceded(tag("<"), parse_html_tag_content).parse(line)?;
     Ok((
         remaining_line,
         (tag_name, tag_attributes, HTMLTagType::OpeningStart),
@@ -330,18 +330,19 @@ fn parse_opening_html_tag_end(line: &str) -> IResult<&str, (&str, HTMLTagType)> 
     if let Ok((remaining_line, tag_attributes)) = alt((
         delimited(multispace0, parse_html_tag_attributes_str, tag(">")),
         terminated(multispace0, tag(">")),
-    ))(line)
+    ))
+    .parse(line)
     {
         Ok((remaining_line, (tag_attributes, HTMLTagType::Opening)))
     } else {
-        let (_, attributes) = preceded(multispace0, rest)(line)?;
+        let (_, attributes) = preceded(multispace0, rest).parse(line)?;
         Ok(("", (attributes, HTMLTagType::OpeningStart)))
     }
 }
 
 fn parse_self_closing_html_tag(line: &str) -> IResult<&str, (&str, &str, HTMLTagType)> {
     let (remaining_line, (tag_name, tag_attributes)) =
-        delimited(tag("<"), parse_html_tag_content, tag("/>"))(line)?;
+        delimited(tag("<"), parse_html_tag_content, tag("/>")).parse(line)?;
     Ok((
         remaining_line,
         (tag_name, tag_attributes, HTMLTagType::SelfClosing),
@@ -352,7 +353,8 @@ fn parse_self_closing_html_tag_end(line: &str) -> IResult<&str, (&str, HTMLTagTy
     let (remaining_line, tag_attributes) = alt((
         delimited(multispace0, parse_html_tag_attributes_str, tag("/>")),
         terminated(multispace0, tag("/>")),
-    ))(line)?;
+    ))
+    .parse(line)?;
     Ok((remaining_line, (tag_attributes, HTMLTagType::SelfClosing)))
 }
 
@@ -387,7 +389,8 @@ fn parse_opening_html_tag_with_attributes<'a>(
         tag(delimiter.as_str()),
         delimited(multispace1, take_until(">"), multispace0),
         tag(">"),
-    )(line)?;
+    )
+    .parse(line)?;
     Ok((tag_close, attributes))
 }
 
@@ -436,40 +439,44 @@ fn segment_strong_emphasis_line(line: &str) -> IResult<&str, (&str, &str, &str)>
 
 fn parse_html_tag_attribute(line: &str) -> IResult<&str, (&str, &str)> {
     alt((
-        tuple((
+        (
             preceded(multispace0, take_until("=")),
             delimited(tag("=\""), take_until("\""), tag("\"")),
-        )),
-        tuple((
+        ),
+        (
             preceded(multispace0, take_until("=")),
             delimited(tag("={`"), take_until("`}"), tag("`}")),
-        )),
-    ))(line)
+        ),
+    ))
+    .parse(line)
 }
 
 fn parse_astro_client_directive(line: &str) -> IResult<&str, (&str, &str)> {
     preceded(
         multispace0,
         separated_pair(alphanumeric1, tag(":"), alphanumeric1),
-    )(line)
+    )
+    .parse(line)
 }
 
 fn parse_html_tag_attributes(attributes: &str) -> IResult<&str, Vec<(&str, &str)>> {
     many0(alt((
         parse_astro_client_directive,
         parse_html_tag_attribute,
-    )))(attributes)
+    )))
+    .parse(attributes)
 }
 
 fn parse_href_scheme(href: &str) -> IResult<&str, &str> {
-    alt((tag_no_case("HTTP://"), tag_no_case("HTTPS://")))(href)
+    alt((tag_no_case("HTTP://"), tag_no_case("HTTPS://"))).parse(href)
 }
 
 fn form_html_anchor_element_line(line: &str) -> IResult<&str, String> {
     let (_, (initial_segment, anchor_attributes_segment, final_segment)) = alt((
         segment_anchor_element_with_attributes_line,
         segment_anchor_element_no_attributes_line,
-    ))(line)?;
+    ))
+    .parse(line)?;
     let (_, attributes_vector) = parse_html_tag_attributes(anchor_attributes_segment)?;
     let (remaining_line, link_content) = take_until("</a>")(final_segment)?;
 
@@ -520,22 +527,25 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
 fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedCodeBlockMeta> {
     let (meta, _) = tag("```")(line)?;
     let (remaining_meta, language_option) =
-        opt(alt((terminated(take_until(" "), tag(" ")), alpha1)))(meta)?;
+        opt(alt((terminated(take_until(" "), tag(" ")), alpha1))).parse(meta)?;
     let (remaining_meta, first_line_number_option) =
-        opt(alt((terminated(digit1, tag(" ")), digit1)))(remaining_meta)?;
+        opt(alt((terminated(digit1, tag(" ")), digit1))).parse(remaining_meta)?;
     let (remaining_meta, highlight_lines_option) = opt(alt((
         delimited(peek(tag("{")), is_not(" \t\r\n"), tag(" ")),
         preceded(peek(tag("{")), is_not(" \t\r\n")),
-    )))(remaining_meta)?;
+    )))
+    .parse(remaining_meta)?;
     let (remaining_meta, title_option) = opt(alt((
         delimited(tag("\""), take_until("\" "), tag("\" ")),
         delimited(tag("\""), take_until("\""), tag("\"")),
-    )))(remaining_meta)?;
+    )))
+    .parse(remaining_meta)?;
     let (remaining_meta, caption_option) = opt(alt((
         delimited(tag("["), take_until("] "), tag("] ")),
         delimited(tag("["), take_until("]"), tag("]")),
-    )))(remaining_meta)?;
-    let (_, collapse_option_tag) = opt(tag("<>"))(remaining_meta)?;
+    )))
+    .parse(remaining_meta)?;
+    let (_, collapse_option_tag) = opt(tag("<>")).parse(remaining_meta)?;
     let collapse_option = match collapse_option_tag {
         Some("<>") => Some(true),
         _ => Some(false),
@@ -562,11 +572,12 @@ fn parse_html_block_level_comment_first_line(line: &str) -> IResult<&str, &str> 
 }
 
 fn parse_html_block_level_comment_last_line(line: &str) -> IResult<&str, &str> {
-    terminated(take_until("-->"), tag("-->"))(line)
+    terminated(take_until("-->"), tag("-->")).parse(line)
 }
 
 fn parse_table_column_alignment(line: &str) -> IResult<&str, TableAlign> {
-    let (remaining_line, cell) = terminated(take_until("|"), pair(tag("|"), multispace0))(line)?;
+    let (remaining_line, cell) =
+        terminated(take_until("|"), pair(tag("|"), multispace0)).parse(line)?;
     let (_, alignment) = alt((
         value(
             TableAlign::Centre,
@@ -574,23 +585,24 @@ fn parse_table_column_alignment(line: &str) -> IResult<&str, TableAlign> {
         ),
         value(TableAlign::Left, preceded(tag(":"), tag("---"))),
         value(TableAlign::Right, terminated(tag("---"), tag(":"))),
-    ))(cell)?;
+    ))
+    .parse(cell)?;
     Ok((remaining_line, alignment))
 }
 
 fn parse_table_cell(line: &str) -> IResult<&str, &str> {
-    terminated(take_until("|"), pair(tag("|"), multispace0))(line)
+    terminated(take_until("|"), pair(tag("|"), multispace0)).parse(line)
 }
 
 // parses row separating header and body containing alignment markers
 fn parse_table_header_row(line: &str) -> IResult<&str, Vec<TableAlign>> {
-    let (headings, _) = preceded(tag("|"), multispace1)(line)?;
-    many1(parse_table_column_alignment)(headings)
+    let (headings, _) = preceded(tag("|"), multispace1).parse(line)?;
+    many1(parse_table_column_alignment).parse(headings)
 }
 
 fn parse_table_line(line: &str) -> IResult<&str, Vec<&str>> {
-    let (headings, _) = preceded(tag("|"), multispace1)(line)?;
-    many1(parse_table_cell)(headings)
+    let (headings, _) = preceded(tag("|"), multispace1).parse(line)?;
+    many1(parse_table_cell).parse(headings)
 }
 
 fn form_html_block_element_first_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -725,7 +737,7 @@ fn form_table_head_first_line(line: &str) -> IResult<&str, (String, LineType, us
 
 // optimistically try to end the head section or alternatively add additional head line
 fn form_table_head_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
-    alt((form_table_header_row, form_table_head_row))(line)
+    alt((form_table_header_row, form_table_head_row)).parse(line)
 }
 
 fn form_fenced_code_block_last_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
@@ -760,13 +772,15 @@ fn form_inline_wrap_text_number_range(line: &str) -> IResult<&str, String> {
         tag("<InlineCodeFragment code={`"),
         digit1,
         tag("`} />"),
-    ))(line)?;
-    let (remaining_line, _) = alt((tag("&ndash;"), tag("-")))(remaining_line)?;
+    ))
+    .parse(line)?;
+    let (remaining_line, _) = alt((tag("&ndash;"), tag("-"))).parse(remaining_line)?;
     let (remaining_line, second_tag) = recognize(separated_pair(
         tag("<InlineCodeFragment code={`"),
         digit1,
         tag("`} />"),
-    ))(remaining_line)?;
+    ))
+    .parse(remaining_line)?;
 
     Ok((
         remaining_line,
@@ -779,7 +793,8 @@ fn form_inline_wrap_inline_code_fragment(line: &str) -> IResult<&str, String> {
         tag("<InlineCodeFragment code={`"),
         take_until("/>"),
         tag("/>"),
-    )(line)?;
+    )
+    .parse(line)?;
 
     Ok((
         remaining_line,
@@ -792,7 +807,8 @@ fn format_inline_wrap_text_number_range(line: &str) -> IResult<&str, String> {
     let (remaining_line, inline_code_fragment_part) = alt((
         form_inline_wrap_text_number_range,
         form_inline_wrap_inline_code_fragment,
-    ))(remaining_line)?;
+    ))
+    .parse(remaining_line)?;
 
     match format_inline_wrap_text_number_range(remaining_line) {
         Ok((_, value)) => Ok((
@@ -817,7 +833,7 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
         let parsed_result = match &line_from_tag[0..1] {
             "`" => form_code_span_line(line_from_tag),
             "<" => form_html_anchor_element_line(line_from_tag),
-            "*" => alt((form_strong_emphasis_line, form_emphasis_line))(line_from_tag),
+            "*" => alt((form_strong_emphasis_line, form_emphasis_line)).parse(line_from_tag),
             _ => return Ok(("", line.to_string())),
         };
         let Ok((final_segment, initial_segment)) = parsed_result else {
@@ -835,7 +851,7 @@ fn parse_inline_wrap_text(line: &str) -> IResult<&str, String> {
 }
 
 fn parse_heading_text(line: &str) -> IResult<&str, usize> {
-    let (heading, level) = terminated(many1_count(tag("#")), multispace1)(line)?;
+    let (heading, level) = terminated(many1_count(tag("#")), multispace1).parse(line)?;
     Ok((heading, level))
 }
 
@@ -844,17 +860,17 @@ fn parse_inline_wrap_segment<'a>(
     line: &'a str,
     delimiter: &'a str,
 ) -> IResult<&'a str, (&'a str, &'a str)> {
-    separated_pair(take_until(delimiter), tag(delimiter), rest)(line)
+    separated_pair(take_until(delimiter), tag(delimiter), rest).parse(line)
 }
 
 fn parse_ordered_list_text(line: &str) -> IResult<&str, (usize, &str)> {
     let (content_text, (indentation, start, _full_stop_tag)) =
-        tuple((many0_count(tag(" ")), digit1, tag(". ")))(line)?;
+        (many0_count(tag(" ")), digit1, tag(". ")).parse(line)?;
     Ok((content_text.trim(), (indentation, start)))
 }
 
 fn parse_unordered_list_text(line: &str) -> IResult<&str, usize> {
-    let (heading, indentation) = terminated(many0_count(tag(" ")), tag("- "))(line)?;
+    let (heading, indentation) = terminated(many0_count(tag(" ")), tag("- ")).parse(line)?;
     Ok((heading, indentation))
 }
 
@@ -1253,7 +1269,8 @@ fn parse_mdx_line(line: &str) -> Option<(String, LineType, usize)> {
         form_ordered_list_first_line,
         form_unordered_list_line,
         form_inline_wrap_text,
-    ))(line)
+    ))
+    .parse(line)
     {
         Ok((_, (line, line_type, level))) => {
             if line.is_empty() {
