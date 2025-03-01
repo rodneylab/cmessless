@@ -882,7 +882,7 @@ fn form_heading_line(line: &str) -> IResult<&str, (String, LineType, usize)> {
         "",
         (
             format!(
-                "<h{level} id=\"{id}\"><Heading id=\"{id}\" text=\"{}\"/></h{level}>",
+                "<h{level} id=\"{id}\"><Heading client:visible id=\"{id}\" text=\"{}\"/></h{level}>",
                 format_heading_widows(parsed_text.trim_end())
             ),
             LineType::Heading,

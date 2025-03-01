@@ -669,7 +669,7 @@ pub fn test_parse_mdx_line() {
             parse_mdx_line(mdx_line),
         Some((
             String::from(
-                "<h1 id=\"getting-started-with-newtech-\"><Heading id=\"getting-started-with-newtech-\" text=\"Getting Started with NewTech\"/></h1>"
+                "<h1 id=\"getting-started-with-newtech-\"><Heading client:visible id=\"getting-started-with-newtech-\" text=\"Getting Started with NewTech\"/></h1>"
             ),
             LineType::Heading,
             1
@@ -681,7 +681,7 @@ pub fn test_parse_mdx_line() {
         parse_mdx_line(mdx_line),
         Some((
             String::from(
-                "<h3 id=\"confused-what-does-all-this-mean\"><Heading id=\"confused-what-does-all-this-mean\" text=\"😕 What Does All This Mean?\"/></h3>"
+                "<h3 id=\"confused-what-does-all-this-mean\"><Heading client:visible id=\"confused-what-does-all-this-mean\" text=\"😕 What Does All This Mean?\"/></h3>"
             ),
             LineType::Heading,
             3
