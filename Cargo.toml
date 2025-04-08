@@ -14,14 +14,14 @@ rust-version = "1.77"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.34", features = ["derive"] }
+clap = { version = "4.5.35", features = ["derive"] }
 deunicode = "1.6.1"
-markup_fmt = "0.19.0"
+markup_fmt = "0.19.1"
 miette = "7.5.0"
 nom = { version = "8.0.0", features = ["alloc"] }
 notify = "8.0.0"
 notify-debouncer-mini = { version = "0.6.0", default-features = false }
-tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 strip = "debuginfo"

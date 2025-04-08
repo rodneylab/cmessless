@@ -1043,7 +1043,7 @@ import InlineCodeFragment from '~components/InlineCodeFragment.svelte';",
             "import Questions from '~components/Questions.svelte';",
         ));
         result.push(format!(
-            "import questions from '~content/blog/{slug}/questions.json';"
+            "import questions from '~content-raw/blog/{slug}/questions.json';"
         ));
     }
     if components.contains(&JSXComponentType::Tweet) {
