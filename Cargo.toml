@@ -15,9 +15,9 @@ rust-version = "1.77"
 
 [dependencies]
 clap = { version = "4.5.37", features = ["derive"] }
-deunicode = "1.6.1"
+deunicode = "1.6.2"
 markup_fmt = "0.19.1"
-miette = "7.5.0"
+miette = "7.6.0"
 nom = { version = "8.0.0", features = ["alloc"] }
 notify = "8.0.0"
 notify-debouncer-mini = { version = "0.6.0", default-features = false }
