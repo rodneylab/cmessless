@@ -524,7 +524,7 @@ fn form_code_span_line(line: &str) -> IResult<&str, String> {
     ))
 }
 
-fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedCodeBlockMeta> {
+fn parse_fenced_code_block_first_line(line: &str) -> IResult<&str, ParsedFencedCodeBlockMeta<'_>> {
     let (meta, _) = tag("```")(line)?;
     let (remaining_meta, language_option) =
         opt(alt((terminated(take_until(" "), tag(" ")), alpha1))).parse(meta)?;
