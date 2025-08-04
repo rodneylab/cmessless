@@ -21,7 +21,7 @@ miette = "7.6.0"
 nom = { version = "8.0.0", features = ["alloc"] }
 notify = "8.1.0"
 notify-debouncer-mini = { version = "0.6.0", default-features = false }
-tokio = { version = "1.47.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 strip = "debuginfo"
