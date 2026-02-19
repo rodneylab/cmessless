@@ -336,12 +336,8 @@ impl JSXComponentRegister {
     }
 
     pub fn insert_prop(&mut self, key: &str, value: &str) {
-        if self.how_to.is_some() {
-            let () = &self
-                .how_to
-                .as_mut()
-                .expect("Error inserting How to Prop")
-                .insert_prop(key, value);
+        if let Some(ref mut how_to) = &mut self.how_to {
+            how_to.insert_prop(key, value);
         } else {
             self.how_to = Some(HowToComponent::new());
             self.insert_prop(key, value);
