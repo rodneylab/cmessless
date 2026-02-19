@@ -14,9 +14,9 @@ rust-version = "1.77"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.54", features = ["derive"] }
+clap = { version = "4.5.59", features = ["derive"] }
 deunicode = "1.6.2"
-markup_fmt = "0.25.3"
+markup_fmt = "0.26.0"
 miette = "7.6.0"
 nom = { version = "8.0.0", features = ["alloc"] }
 notify = "8.2.0"
