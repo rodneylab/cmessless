@@ -6,22 +6,21 @@ edition = "2021"
 homepage = "https://rodneylab.com"
 license = "BSD-3-Clause"
 repository = "https://github.com/rodneylab/cmessless"
-description = "A markdown parser to output Astro markup."
-
 # notify 8.0.0 raises msrv to 1.77
 rust-version = "1.77"
+description = "A markdown parser to output Astro markup."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 deunicode = "1.6.2"
-markup_fmt = "0.27.0"
+markup_fmt = "0.27.3"
 miette = "7.6.0"
 nom = { version = "8.0.0", features = ["alloc"] }
 notify = "8.2.0"
 notify-debouncer-mini = { version = "0.7.0", default-features = false }
-tokio = { version = "1.51.1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 strip = "debuginfo"
