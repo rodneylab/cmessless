@@ -1721,7 +1721,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                 .expect("[ ERROR ] Astro markup should not contain UTF-8 characters."),
             Language::Astro,
             &options,
-            |code, _| Ok::<_, std::convert::Infallible>(code.into()),
+            |code, _| Ok(code.into()),
         )
         .unwrap_or_else(|_| {
             panic!(
