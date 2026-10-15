@@ -192,13 +192,10 @@ impl HowToComponent {
         let mut result: Vec<String> = vec!["const howTo = {".to_string()];
 
         if self.props.contains_key("name") {
-            result.push(format!("  name: \"{}\",", self.props.get("name").unwrap()));
+            result.push(format!("  name: \"{}\",", self.props["name"]));
         }
         if self.props.contains_key("description") {
-            result.push(format!(
-                "  description: \"{}\",",
-                self.props.get("description").unwrap()
-            ));
+            result.push(format!("  description: \"{}\",", self.props["description"]));
         }
         result.push("  sections: [".to_string());
         for (position, section) in self.sections.iter().enumerate() {

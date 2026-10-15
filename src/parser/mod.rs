@@ -646,30 +646,30 @@ fn form_fenced_code_block_first_line(line: &str) -> IResult<&str, (String, LineT
         markup.push_str("\n  language=\"");
         markup.push_str(value);
         markup.push('\"');
-    };
+    }
     if let Some(value) = first_line_number_option {
         markup.push_str("\n  firstLine={");
         markup.push_str(value);
         markup.push('}');
-    };
+    }
     if let Some(value) = highlight_line_numbers_option {
         markup.push_str("\n  highlightLines={`");
         markup.push_str(value);
         markup.push_str("`}");
-    };
+    }
     if let Some(value) = title_option {
         markup.push_str("\n  title=\"");
         markup.push_str(value);
         markup.push('\"');
-    };
+    }
     if let Some(value) = caption_option {
         markup.push_str("\n  caption=\"");
         markup.push_str(value);
         markup.push('\"');
-    };
+    }
     if let Some(true) = collapse_option {
         markup.push_str("\n  collapse");
-    };
+    }
     markup.push_str("\n  code={`");
     Ok(("", (markup, LineType::FencedCodeBlockOpen, 0)))
 }
@@ -1133,7 +1133,7 @@ const {
         );
     }
     for line in prepared_markup {
-        result.push(line.to_string());
+        result.push(line.clone());
     }
     result.push(String::from("---\n"));
     result
@@ -1301,7 +1301,7 @@ pub fn parse_frontmatter(file: &File) -> usize {
              * frontmatter
              */
             return 0;
-        };
+        }
         line_number += 1;
     }
     line_number
@@ -1449,7 +1449,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
 
                     if let Some(value) = open_jsx_component_register.how_to() {
                         astro_frontmatter_markup.append(&mut value.astro_frontmatter_markup());
-                    };
+                    }
                 }
                 LineType::HowToSection => {
                     present_jsx_component_types.insert(JSXComponentType::HowToSection);
@@ -1671,7 +1671,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
                     }
                 }
             }
-        };
+        }
     }
     let astro_frontmatter = form_astro_frontmatter(
         &present_jsx_component_types,
@@ -1685,7 +1685,7 @@ pub fn parse_mdx_file<P1: AsRef<Path>, P2: AsRef<Path>>(
         for token in &tokens {
             println!("{token}");
         }
-        println! {"\n"};
+        println!("\n");
     }
 
     let Ok(mut outfile) = File::create(output_path) else {

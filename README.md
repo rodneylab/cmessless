@@ -1,8 +1,16 @@
 <img src="./images/rodneylab-github-cmessless.png" alt="Rodney Lab c mess less Github banner">
 
 <p align="center">
-  <a aria-label="Open Rodney Lab site" href="https://rodneylab.com" rel="nofollow noopener noreferrer">
-    <img alt="Rodney Lab logo" src="https://rodneylab.com/assets/icon.png" width="60" />
+  <a
+    aria-label="Open Rodney Lab site"
+    href="https://rodneylab.com"
+    rel="nofollow noopener noreferrer"
+  >
+    <img
+      alt="Rodney Lab logo"
+      src="https://rodneylab.com/assets/icon.png"
+      width="60"
+    />
   </a>
 </p>
 <h1 align="center">
