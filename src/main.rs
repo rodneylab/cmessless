@@ -66,7 +66,7 @@ fn print_long_banner() {
 /***
  * watch a single file for changes and parse to output_path, when changes occur
  */
-async fn debounce_watch<P1: AsRef<Path>, P2: AsRef<Path>>(
+fn debounce_watch<P1: AsRef<Path>, P2: AsRef<Path>>(
     mdx_path: &P1,
     output_path: &P2,
     verbose: bool,
@@ -152,10 +152,10 @@ fn output_path_from_relative_input<P1: AsRef<Path>, P2: AsRef<Path>>(
  * watch multiple input paths for changes, input paths need to contain a '/./'
  * pattern to mark the relative part of the path.  To get the output path, we place the relative
  * part (after the '/./') on the end of the `output_path_root`, passed in. Output will have a .astro
- * extension.  Multiple paths may be passed in, but perhaps only one or two input files eveer get
- * updated, so to save working out the outpaths for unused paths, a hash map caches the values.
+ * extension.  Multiple paths may be passed in, but perhaps only one or two input files ever get
+ * updated, so to save working out the output paths for unused paths, a hashmap caches the values.
  */
-async fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
+fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
     mdx_paths: &[P1],
     output_path_root: &P2,
     verbose: bool,
@@ -201,7 +201,7 @@ async fn debounce_watch_multiple<P1: AsRef<Path>, P2: AsRef<Path>>(
                             output_paths_map
                                 .insert((path_as_string).to_string(), output_path_result);
                         }
-                    };
+                    }
                 }
             }
             Err(e) => eprintln!("Something went wrong: {e:?}"),
@@ -293,9 +293,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if cli.watch {
         if cli.path.len() == 1 && !cli.relative {
-            debounce_watch(&inputs[0], &cli.output, cli.verbose).await;
+            debounce_watch(&inputs[0], &cli.output, cli.verbose);
         } else {
-            debounce_watch_multiple(&inputs, &cli.output, cli.verbose).await;
+            debounce_watch_multiple(&inputs, &cli.output, cli.verbose);
         }
         return Ok(());
     }
