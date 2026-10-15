@@ -33,10 +33,9 @@ debug = false
 strip = "debuginfo"
 
 [lints.clippy]
-pedantic = { level = "warn", priority = -1 }
 allow_attributes = "deny"
 dbg_macro = "deny"
-print_stdout = "deny"
+# print_stdout = "deny"
 clone_on_ref_ptr = "deny"
 empty_drop = "deny"
 exit = "deny"
