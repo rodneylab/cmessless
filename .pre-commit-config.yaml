@@ -4,7 +4,7 @@ repos:
         stages:
           - commit-msg
     repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.19.2
+    rev: v4.19.3
   - hooks:
       - id: fmt
       - id: cargo-check
