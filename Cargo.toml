@@ -18,7 +18,7 @@ deunicode = "1.6.2"
 markup_fmt = "0.27.6"
 miette = "7.6.0"
 nom = { version = "8.0.0", features = ["alloc"] }
-notify = "8.2.1"
+notify = "8.2.2"
 notify-debouncer-mini = { version = "0.7.0", default-features = false }
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
 
